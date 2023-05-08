@@ -128,7 +128,7 @@ $(USER_E_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_E_OBJS)
 all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET)
 .PHONY:all
 
-run: $(KERNEL_TARGET) $(USER_TARGET)
+run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET)
 	@echo "********************HUST PKE********************"
 	spike $(KERNEL_TARGET) /bin/app_exec
 
