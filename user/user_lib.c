@@ -148,6 +148,20 @@ int closedir_u(int fd) {
 } 
 
 //
+// lib call to link
+//
+int link_u(const char *fn1, const char *fn2){
+  return do_user_call(SYS_user_link, (uint64)fn1, (uint64)fn2, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to unlink
+//
+int unlink_u(const char *fn){
+  return do_user_call(SYS_user_unlink, (uint64)fn, 0, 0, 0, 0, 0, 0);
+}
+
+//
 // lib call to close
 //
 int close(int fd) {

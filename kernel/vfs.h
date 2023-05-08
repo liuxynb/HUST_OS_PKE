@@ -28,6 +28,8 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count);
 ssize_t vfs_lseek(struct file *file, ssize_t offset, int whence);
 int vfs_stat(struct file *file, struct istat *istat);
 int vfs_disk_stat(struct file *file, struct istat *istat);
+int vfs_link(const char *oldpath, const char *newpath);
+int vfs_unlink(const char *path);
 int vfs_close(struct file *file);
 
 // directory interfaces
@@ -140,6 +142,10 @@ struct vinode_ops {
   struct vinode *(*viop_create)(struct vinode *parent, struct dentry *sub_dentry);
   int (*viop_lseek)(struct vinode *node, ssize_t new_off, int whence, int *off);
   int (*viop_disk_stat)(struct vinode *node, struct istat *istat);
+  int (*viop_link)(struct vinode *parent, struct dentry *sub_dentry,
+                   struct vinode *link_node);
+  int (*viop_unlink)(struct vinode *parent, struct dentry *sub_dentry,
+                     struct vinode *unlink_node);
   struct vinode *(*viop_lookup)(struct vinode *parent,
                                 struct dentry *sub_dentry);
 
@@ -171,6 +177,8 @@ struct vinode_ops {
 #define viop_create(node, name)                (node->i_ops->viop_create(node, name))
 #define viop_lseek(node, new_off, whence, off) (node->i_ops->viop_lseek(node, new_off, whence, off))
 #define viop_disk_stat(node, istat)            (node->i_ops->viop_disk_stat(node, istat))
+#define viop_link(node, name, link_node)       (node->i_ops->viop_link(node, name, link_node))
+#define viop_unlink(node, name, unlink_node)   (node->i_ops->viop_unlink(node, name, unlink_node))
 #define viop_lookup(parent, sub_dentry)        (parent->i_ops->viop_lookup(parent, sub_dentry))
 #define viop_readdir(dir_vinode, dir, offset)  (dir_vinode->i_ops->viop_readdir(dir_vinode, dir, offset))
 #define viop_mkdir(dir, sub_dentry)            (dir->i_ops->viop_mkdir(dir, sub_dentry))

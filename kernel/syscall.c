@@ -197,6 +197,23 @@ ssize_t sys_user_closedir(int fd){
 }
 
 //
+// lib call to link
+//
+ssize_t sys_user_link(char * vfn1, char * vfn2){
+  char * pfn1 = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)vfn1);
+  char * pfn2 = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)vfn2);
+  return do_link(pfn1, pfn2);
+}
+
+//
+// lib call to unlink
+//
+ssize_t sys_user_unlink(char * vfn){
+  char * pfn = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)vfn);
+  return do_unlink(pfn);
+}
+
+//
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
@@ -239,6 +256,11 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_mkdir((char *)a1);
     case SYS_user_closedir:
       return sys_user_closedir(a1);
+    // added @lab4_3
+    case SYS_user_link:
+      return sys_user_link((char *)a1, (char *)a2);
+    case SYS_user_unlink:
+      return sys_user_unlink((char *)a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }

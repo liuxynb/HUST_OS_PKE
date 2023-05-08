@@ -24,6 +24,8 @@ const struct vinode_ops hostfs_i_ops = {
     .viop_write_back_vinode = hostfs_write_back_vinode,
 
     // not implemented
+    .viop_link = hostfs_link,
+    .viop_unlink = hostfs_unlink,
     .viop_readdir = hostfs_readdir,
     .viop_mkdir = hostfs_mkdir,
 };
@@ -230,6 +232,17 @@ int hostfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence,
   *offset = spike_file_lseek(f, new_offset, whence);
   if (*offset >= 0)
     return 0;
+  return -1;
+}
+
+int hostfs_link(struct vinode *parent, struct dentry *sub_dentry,
+                struct vinode *link_node) {
+  panic("hostfs_link not implemented!\n");
+  return -1;
+}
+
+int hostfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *unlink_node) {
+  panic("hostfs_unlink not implemented!\n");
   return -1;
 }
 

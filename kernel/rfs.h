@@ -79,6 +79,8 @@ struct vinode *rfs_lookup(struct vinode *parent, struct dentry *sub_dentry);
 struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry);
 int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offset);
 int rfs_disk_stat(struct vinode *vinode, struct istat *istat);
+int rfs_link(struct vinode *parent, struct dentry *sub_dentry, struct vinode *link_node);
+int rfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *unlink_vinode);
 
 int rfs_hook_opendir(struct vinode *dir_vinode, struct dentry *dentry);
 int rfs_hook_closedir(struct vinode *dir_vinode, struct dentry *dentry);

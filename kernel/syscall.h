@@ -27,6 +27,9 @@
 #define SYS_user_readdir  (SYS_user_base + 25)
 #define SYS_user_mkdir    (SYS_user_base + 26)
 #define SYS_user_closedir (SYS_user_base + 27)
+// added @lab4_3
+#define SYS_user_link   (SYS_user_base + 28)
+#define SYS_user_unlink (SYS_user_base + 29)
 
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long a7);
 

@@ -207,3 +207,17 @@ int do_closedir(int fd) {
   struct file *pfile = get_opened_file(fd);
   return vfs_closedir(pfile);
 }
+
+//
+// create hard link to a file
+//
+int do_link(char *oldpath, char *newpath) {
+  return vfs_link(oldpath, newpath);
+}
+
+//
+// remove a hard link to a file
+//
+int do_unlink(char *path) {
+  return vfs_unlink(path);
+}

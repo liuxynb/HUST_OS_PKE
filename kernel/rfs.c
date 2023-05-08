@@ -25,6 +25,8 @@ const struct vinode_ops rfs_i_ops = {
     .viop_create = rfs_create,
     .viop_lseek = rfs_lseek,
     .viop_disk_stat = rfs_disk_stat,
+    .viop_link = rfs_link,
+    .viop_unlink = rfs_unlink,
     .viop_lookup = rfs_lookup,
 
     .viop_readdir = rfs_readdir,
@@ -568,6 +570,145 @@ int rfs_disk_stat(struct vinode *vinode, struct istat *istat) {
   istat->st_nlinks = dinode->nlinks;
   istat->st_blocks = dinode->blocks;
   free_page(dinode);
+  return 0;
+}
+
+//
+// create a hard link under a direntry "parent" for an existing file of "link_node"
+//
+int rfs_link(struct vinode *parent, struct dentry *sub_dentry, struct vinode *link_node) {
+  // TODO (lab4_3): we now need to establish a hard link to an existing file whose vfs
+  // inode is "link_node". To do that, we need first to know the name of the new (link)
+  // file, and then, we need to increase the link count of the existing file. Lastly, 
+  // we need to make the changes persistent to disk. To know the name of the new (link)
+  // file, you need to stuty the structure of dentry, that contains the name member;
+  // To incease the link count of the existing file, you need to study the structure of
+  // vfs inode, since it contains the inode information of the existing file.
+  //
+  // hint: to accomplish this experiment, you need to:
+  // 1) increase the link count of the file to be hard-linked;
+  // 2) append the new (link) file as a dentry to its parent directory; you can use 
+  //    rfs_add_direntry here.
+  // 3) persistent the changes to disk. you can use rfs_write_back_vinode here.
+  //
+  panic("You need to implement the code for creating a hard link in lab4_3.\n" );
+}
+
+//
+// remove a hard link with "name" under a direntry "parent"
+//
+int rfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *unlink_vinode) {
+  struct rfs_device *rdev = rfs_device_list[parent->sb->s_dev->dev_id];
+
+  // ** find the direntry in the directory file
+  int total_direntrys = parent->size / sizeof(struct rfs_direntry);
+  int one_block_direntrys = RFS_BLKSIZE / sizeof(struct rfs_direntry);
+
+  struct rfs_direntry *p_direntry = NULL;
+  int delete_index;
+  for (delete_index = 0; delete_index < total_direntrys; ++delete_index) {
+    // read in the disk block at boundary
+    if (delete_index % one_block_direntrys == 0) {
+      rfs_r1block(rdev, parent->addrs[delete_index / one_block_direntrys]);
+      p_direntry = (struct rfs_direntry *)rdev->iobuffer;
+    }
+    if (strcmp(p_direntry->name, sub_dentry->name) == 0) {  // found
+      break;
+    }
+    ++p_direntry;
+  }
+
+  int inum = p_direntry->inum;
+
+  if (delete_index == total_direntrys) {
+    sprint("unlink: file %s not found.\n", sub_dentry->name);
+    return -1;
+  }
+
+  // ** read the disk inode of the file to be unlinked
+  struct rfs_dinode *unlink_dinode = rfs_read_dinode(rdev, inum);
+
+  // if this assertion fails, it indicates that the previous modification to nlinks
+  // was not written back to disk, which is not allowed
+  assert(unlink_vinode->nlinks == unlink_dinode->nlinks);
+
+  // ** decrease vinode nlinks by 1
+  unlink_vinode->nlinks--;
+
+  // ** update disk inode nlinks
+  unlink_dinode->nlinks = unlink_vinode->nlinks;
+
+  // ** if nlinks == 0, free the disk inode and disk blocks
+  if (unlink_dinode->nlinks == 0) {
+    // free disk blocks
+    for (int i = 0; i < unlink_dinode->blocks; ++i) {
+      rfs_free_block(parent->sb, unlink_dinode->addrs[i]);
+    }
+    // free disk inode
+    unlink_dinode->type = R_FREE;
+  }
+  // ** write the disk inode back to disk
+  rfs_write_dinode(rdev, unlink_dinode, inum);
+  free_page(unlink_dinode);
+
+  // ** remove the direntry from the directory
+
+  // handle the first block
+  int delete_block_index = delete_index / one_block_direntrys;
+  rfs_r1block(rdev, parent->addrs[delete_block_index]);
+
+  int offset = delete_index % one_block_direntrys;
+  memmove(rdev->iobuffer + offset * sizeof(struct rfs_direntry),
+          rdev->iobuffer + (offset + 1) * sizeof(struct rfs_direntry),
+          (one_block_direntrys - offset - 1) * sizeof(struct rfs_direntry));
+
+  struct rfs_direntry *previous_block = (struct rfs_direntry *)alloc_page();
+  memcpy(previous_block, rdev->iobuffer, RFS_BLKSIZE);
+
+  for (int i = delete_block_index + 1; i < parent->blocks; i++) {
+    rfs_r1block(rdev, parent->addrs[i]);
+    struct rfs_direntry *this_block = (struct rfs_direntry *)alloc_page();
+    memcpy(this_block, rdev->iobuffer, RFS_BLKSIZE);
+
+    // copy the first direntry of this block to the last direntry 
+    // of previous block
+    memcpy(previous_block + one_block_direntrys - 1, rdev->iobuffer,
+           sizeof(struct rfs_direntry));
+
+    // move the direntry in this block forward by one
+    memmove(this_block, this_block + 1,
+            (one_block_direntrys - 1) * sizeof(struct rfs_direntry));
+
+    // write the previous block back to disk
+    memcpy(rdev->iobuffer, previous_block, RFS_BLKSIZE);
+    rfs_w1block(rdev, parent->addrs[i - 1]);
+
+    // update previous block
+    free_page(previous_block);
+    previous_block = this_block;
+  }
+
+  // write the last block back to disk
+  memcpy(rdev->iobuffer, previous_block, RFS_BLKSIZE);
+  rfs_w1block(rdev, parent->addrs[parent->blocks - 1]);
+  free_page(previous_block);
+
+  // if the last block is empty, free it
+  total_direntrys--;
+  if (total_direntrys % one_block_direntrys == 0 && parent->blocks > 1) {
+    rfs_free_block(parent->sb, parent->addrs[parent->blocks - 1]);
+    parent->blocks--;
+  }
+
+  // ** update the directory file's size
+  parent->size -= sizeof(struct rfs_direntry);
+
+  // ** write the directory file's inode back to disk
+  if (rfs_write_back_vinode(parent) != 0) {
+    sprint("rfs_unlink: rfs_write_back_vinode failed");
+    return -1;
+  }
+
   return 0;
 }
 

@@ -28,6 +28,8 @@ struct vinode *hostfs_lookup(struct vinode *parent, struct dentry *sub_dentry);
 struct vinode *hostfs_create(struct vinode *parent, struct dentry *sub_dentry);
 int hostfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence,
                   int *offset);
+int hostfs_link(struct vinode *parent, struct dentry *sub_dentry, struct vinode *link_node);
+int hostfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *unlink_node);
 int hostfs_hook_open(struct vinode *f_inode, struct dentry *f_dentry);
 int hostfs_hook_close(struct vinode *f_inode, struct dentry *dentry);
 int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset);

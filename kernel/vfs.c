@@ -256,6 +256,105 @@ int vfs_disk_stat(struct file *file, struct istat *istat) {
 }
 
 //
+// make hard link to the file specified by "oldpath" with the name "newpath"
+// return: -1 on failure, 0 on success.
+//
+int vfs_link(const char *oldpath, const char *newpath) {
+  struct dentry *parent = vfs_root_dentry;
+  char miss_name[MAX_PATH_LEN];
+
+  // lookup oldpath
+  struct dentry *old_file_dentry =
+      lookup_final_dentry(oldpath, &parent, miss_name);
+  if (!old_file_dentry) {
+    sprint("vfs_link: cannot find the file!\n");
+    return -1;
+  }
+
+  if (old_file_dentry->dentry_inode->type != FILE_I) {
+    sprint("vfs_link: cannot link a directory!\n");
+    return -1;
+  }
+
+  parent = vfs_root_dentry;
+  // lookup the newpath
+  // note that parent is changed to be the last directory entry to be accessed
+  struct dentry *new_file_dentry =
+      lookup_final_dentry(newpath, &parent, miss_name);
+  if (new_file_dentry) {
+    sprint("vfs_link: the new file already exists!\n");
+    return -1;
+  }
+
+  char basename[MAX_PATH_LEN];
+  get_base_name(newpath, basename);
+  if (strcmp(miss_name, basename) != 0) {
+    sprint("vfs_link: cannot create file in a non-exist directory!\n");
+    return -1;
+  }
+
+  // do the real hard-link
+  new_file_dentry = alloc_vfs_dentry(basename, old_file_dentry->dentry_inode, parent);
+  int err =
+      viop_link(parent->dentry_inode, new_file_dentry, old_file_dentry->dentry_inode);
+  if (err) return -1;
+
+  // make a new dentry for the new link
+  hash_put_dentry(new_file_dentry);
+
+  return 0;
+}
+
+//
+// unlink (delete) a file specified by "path".
+// return: -1 on failure, 0 on success.
+//
+int vfs_unlink(const char *path) {
+  struct dentry *parent = vfs_root_dentry;
+  char miss_name[MAX_PATH_LEN];
+
+  // lookup the file, find its parent direntry
+  struct dentry *file_dentry = lookup_final_dentry(path, &parent, miss_name);
+  if (!file_dentry) {
+    sprint("vfs_unlink: cannot find the file!\n");
+    return -1;
+  }
+
+  if (file_dentry->dentry_inode->type != FILE_I) {
+    sprint("vfs_unlink: cannot unlink a directory!\n");
+    return -1;
+  }
+
+  if (file_dentry->d_ref > 0) {
+    sprint("vfs_unlink: the file is still opened!\n");
+    return -1;
+  }
+
+  // do the real unlink
+  struct vinode *unlinked_vinode = file_dentry->dentry_inode;
+  int err = viop_unlink(parent->dentry_inode, file_dentry, unlinked_vinode);
+  if (err) return -1;
+
+  // remove the dentry from the hash table
+  hash_erase_dentry(file_dentry);
+  free_vfs_dentry(file_dentry);
+  unlinked_vinode->ref--; 
+
+  // if this inode has been removed from disk
+  if (unlinked_vinode->nlinks == 0) {
+    // no one will remember a dead inode
+    assert(unlinked_vinode->ref == 0);
+
+    // we don't write back the inode, because it has disappeared from the disk
+    hash_erase_vinode(unlinked_vinode);
+    free_page(unlinked_vinode);  // free the vinode
+  }
+  
+
+  return 0;
+}
+
+//
 // close a file at vfs layer.
 //
 int vfs_close(struct file *file) {
