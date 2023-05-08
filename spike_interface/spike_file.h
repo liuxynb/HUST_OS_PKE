@@ -6,16 +6,16 @@
 
 #include "util/types.h"
 
-typedef struct file {
+typedef struct file_t {
   int kfd;  // file descriptor of the host file
   uint32 refcnt;
 } spike_file_t;
 
 extern spike_file_t spike_files[];
 
-#define O_RDONLY 00
-#define O_WRONLY 01
-#define O_RDWR 02
+#define MAX_FILES 128
+#define MAX_FDS 128
+
 #define ENOMEM 12 /* Out of memory */
 
 #define stdin (spike_files + 0)
@@ -60,5 +60,6 @@ void spike_file_init(void);
 int spike_file_dup(spike_file_t* f);
 int spike_file_truncate(spike_file_t* f, off_t len);
 int spike_file_stat(spike_file_t* f, struct stat* s);
+spike_file_t* spike_file_get(int fd);
 
 #endif

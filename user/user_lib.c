@@ -76,3 +76,52 @@ int fork() {
 void yield() {
   do_user_call(SYS_user_yield, 0, 0, 0, 0, 0, 0, 0);
 }
+
+//
+// lib call to open
+//
+int open(const char *pathname, int flags) {
+  return do_user_call(SYS_user_open, (uint64)pathname, flags, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to read
+//
+int read_u(int fd, void * buf, uint64 count){
+  return do_user_call(SYS_user_read, fd, (uint64)buf, count, 0, 0, 0, 0);
+}
+
+//
+// lib call to write
+//
+int write_u(int fd, void *buf, uint64 count) {
+  return do_user_call(SYS_user_write, fd, (uint64)buf, count, 0, 0, 0, 0);
+}
+
+//
+// lib call to seek
+// 
+int lseek_u(int fd, int offset, int whence) {
+  return do_user_call(SYS_user_lseek, fd, offset, whence, 0, 0, 0, 0);
+}
+
+//
+// lib call to read file information
+//
+int stat_u(int fd, struct istat *istat) {
+  return do_user_call(SYS_user_stat, fd, (uint64)istat, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to read file information from disk
+//
+int disk_stat_u(int fd, struct istat *istat) {
+  return do_user_call(SYS_user_disk_stat, fd, (uint64)istat, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to close
+//
+int close(int fd) {
+  return do_user_call(SYS_user_close, fd, 0, 0, 0, 0, 0, 0);
+}

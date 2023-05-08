@@ -2,6 +2,7 @@
 #define _PROC_H_
 
 #include "riscv.h"
+#include "proc_file.h"
 
 typedef struct trapframe_t {
   // space to store context (all common registers)
@@ -89,6 +90,9 @@ typedef struct process_t {
 
   // accounting. added @lab3_3
   int tick_count;
+
+  // file system. added @lab4_1
+  proc_file_management *pfiles;
 }process;
 
 // switch to run user app

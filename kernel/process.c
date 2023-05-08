@@ -151,6 +151,10 @@ process* alloc_process() {
 
   procs[i].total_mapped_region = 4;
 
+  // initialize files_struct
+  procs[i].pfiles = init_proc_file_management();
+  sprint("in alloc_proc. build proc_file_management successfully.\n");
+
   // return after initialization.
   return &procs[i];
 }

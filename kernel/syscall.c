@@ -13,6 +13,7 @@
 #include "pmm.h"
 #include "vmm.h"
 #include "sched.h"
+#include "proc_file.h"
 
 #include "spike_interface/spike_utils.h"
 
@@ -95,6 +96,76 @@ ssize_t sys_user_yield() {
 }
 
 //
+// open file
+//
+ssize_t sys_user_open(char *pathva, int flags) {
+  char* pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
+  return do_open(pathpa, flags);
+}
+
+//
+// read file
+//
+ssize_t sys_user_read(int fd, char *bufva, uint64 count) {
+  int i = 0;
+  while (i < count) { // count can be greater than page size
+    uint64 addr = (uint64)bufva + i;
+    uint64 pa = lookup_pa((pagetable_t)current->pagetable, addr);
+    uint64 off = addr - ROUNDDOWN(addr, PGSIZE);
+    uint64 len = count - i < PGSIZE - off ? count - i : PGSIZE - off;
+    uint64 r = do_read(fd, (char *)pa + off, len);
+    i += r; if (r < len) return i;
+  }
+  return count;
+}
+
+//
+// write file
+//
+ssize_t sys_user_write(int fd, char *bufva, uint64 count) {
+  int i = 0;
+  while (i < count) { // count can be greater than page size
+    uint64 addr = (uint64)bufva + i;
+    uint64 pa = lookup_pa((pagetable_t)current->pagetable, addr);
+    uint64 off = addr - ROUNDDOWN(addr, PGSIZE);
+    uint64 len = count - i < PGSIZE - off ? count - i : PGSIZE - off;
+    uint64 r = do_write(fd, (char *)pa + off, len);
+    i += r; if (r < len) return i;
+  }
+  return count;
+}
+
+//
+// lseek file
+//
+ssize_t sys_user_lseek(int fd, int offset, int whence) {
+  return do_lseek(fd, offset, whence);
+}
+
+//
+// read vinode
+//
+ssize_t sys_user_stat(int fd, struct istat *istat) {
+  struct istat * pistat = (struct istat *)user_va_to_pa((pagetable_t)(current->pagetable), istat);
+  return do_stat(fd, pistat);
+}
+
+//
+// read disk inode
+//
+ssize_t sys_user_disk_stat(int fd, struct istat *istat) {
+  struct istat * pistat = (struct istat *)user_va_to_pa((pagetable_t)(current->pagetable), istat);
+  return do_disk_stat(fd, pistat);
+}
+
+//
+// close file
+//
+ssize_t sys_user_close(int fd) {
+  return do_close(fd);
+}
+
+//
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
@@ -113,6 +184,21 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_fork();
     case SYS_user_yield:
       return sys_user_yield();
+    // added @lab4_1
+    case SYS_user_open:
+      return sys_user_open((char *)a1, a2);
+    case SYS_user_read:
+      return sys_user_read(a1, (char *)a2, a3);
+    case SYS_user_write:
+      return sys_user_write(a1, (char *)a2, a3);
+    case SYS_user_lseek:
+      return sys_user_lseek(a1, a2, a3);
+    case SYS_user_stat:
+      return sys_user_stat(a1, (struct istat *)a2);
+    case SYS_user_disk_stat:
+      return sys_user_disk_stat(a1, (struct istat *)a2);
+    case SYS_user_close:
+      return sys_user_close(a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }
