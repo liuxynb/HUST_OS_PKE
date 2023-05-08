@@ -14,6 +14,7 @@ SRC_DIR        	:= .
 OBJ_DIR 		:= obj
 SPROJS_INCLUDE 	:= -I.  
 
+HOSTFS_ROOT := hostfs_root
 ifneq (,)
   march := -march=
   is_32bit := $(findstring 32,$(march))
@@ -63,12 +64,17 @@ SPIKE_INF_LIB   := $(OBJ_DIR)/spike_interface.a
 
 
 #---------------------	user   -----------------------
-USER_CPPS 		:= user/*.c 
+USER_CPPS 		:= user/app_exec.c user/user_lib.c
 
-USER_CPPS  		:= $(wildcard $(USER_CPPS))
 USER_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CPPS)))
 
-USER_TARGET 	:= $(OBJ_DIR)/app_hardlink
+USER_TARGET 	:= $(HOSTFS_ROOT)/bin/app_exec
+
+USER_E_CPPS 		:= user/app_ls.c user/user_lib.c
+
+USER_E_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_E_CPPS)))
+
+USER_E_TARGET 	:= $(HOSTFS_ROOT)/bin/app_ls
 #------------------------targets------------------------
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	
@@ -76,6 +82,7 @@ $(OBJ_DIR):
 	@-mkdir -p $(dir $(SPIKE_INF_OBJS))
 	@-mkdir -p $(dir $(KERNEL_OBJS))
 	@-mkdir -p $(dir $(USER_OBJS))
+	@-mkdir -p $(dir $(USER_E_OBJS))
 
 $(OBJ_DIR)/%.o : %.c
 	@echo "compiling" $<
@@ -102,7 +109,15 @@ $(KERNEL_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(SPIKE_INF_LIB) $(KERNEL_OBJS) $(KERNE
 
 $(USER_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJS)
 	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
 	@$(COMPILE) --entry=main $(USER_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+	@cp $@ $(OBJ_DIR)
+
+$(USER_E_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_E_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_E_OBJS) $(UTIL_LIB) -o $@
 	@echo "User app has been built into" \"$@\"
 
 -include $(wildcard $(OBJ_DIR)/*/*.d)
@@ -110,12 +125,12 @@ $(USER_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJS)
 
 .DEFAULT_GOAL := $(all)
 
-all: $(KERNEL_TARGET) $(USER_TARGET)
+all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET)
 .PHONY:all
 
 run: $(KERNEL_TARGET) $(USER_TARGET)
 	@echo "********************HUST PKE********************"
-	spike $(KERNEL_TARGET) $(USER_TARGET)
+	spike $(KERNEL_TARGET) /bin/app_exec
 
 # need openocd!
 gdb:$(KERNEL_TARGET) $(USER_TARGET)
@@ -146,4 +161,4 @@ format:
 	@python ./format.py ./
 
 clean:
-	rm -fr ${OBJ_DIR}
+	rm -fr ${OBJ_DIR} ${HOSTFS_ROOT}/bin

@@ -33,5 +33,4 @@ int closedir_u(int fd);
 int link_u(const char *fn1, const char *fn2);
 int unlink_u(const char *fn);
 
-
 #endif
