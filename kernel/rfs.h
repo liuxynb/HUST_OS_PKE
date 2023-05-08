@@ -80,6 +80,11 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry);
 int rfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence, int *offset);
 int rfs_disk_stat(struct vinode *vinode, struct istat *istat);
 
+int rfs_hook_opendir(struct vinode *dir_vinode, struct dentry *dentry);
+int rfs_hook_closedir(struct vinode *dir_vinode, struct dentry *dentry);
+int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset);
+struct vinode *rfs_mkdir(struct vinode *parent, struct dentry *sub_dentry);
+
 struct super_block *rfs_get_superblock(struct device *dev);
 
 extern const struct vinode_ops rfs_i_ops;

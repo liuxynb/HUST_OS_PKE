@@ -30,6 +30,12 @@ int vfs_stat(struct file *file, struct istat *istat);
 int vfs_disk_stat(struct file *file, struct istat *istat);
 int vfs_close(struct file *file);
 
+// directory interfaces
+struct file *vfs_opendir(const char *path);
+int vfs_readdir(struct file *file, struct dir *dir);
+int vfs_mkdir(const char *path);
+int vfs_closedir(struct file *file);
+
 /**** vfs abstract object types ****/
 // system root direntry
 extern struct dentry *vfs_root_dentry;
@@ -137,6 +143,10 @@ struct vinode_ops {
   struct vinode *(*viop_lookup)(struct vinode *parent,
                                 struct dentry *sub_dentry);
 
+  // directory operations
+  int (*viop_readdir)(struct vinode *dir_vinode, struct dir *dir, int *offset);
+  struct vinode *(*viop_mkdir)(struct vinode *parent, struct dentry *sub_dentry);
+
   // write back inode to disk
   int (*viop_write_back_vinode)(struct vinode *node);
 
@@ -148,6 +158,8 @@ struct vinode_ops {
   // times.
   int (*viop_hook_open)(struct vinode *node, struct dentry *dentry);
   int (*viop_hook_close)(struct vinode *node, struct dentry *dentry);
+  int (*viop_hook_opendir)(struct vinode *node, struct dentry *dentry);
+  int (*viop_hook_closedir)(struct vinode *node, struct dentry *dentry);
 };
 
 // vinode operation interface
@@ -160,6 +172,8 @@ struct vinode_ops {
 #define viop_lseek(node, new_off, whence, off) (node->i_ops->viop_lseek(node, new_off, whence, off))
 #define viop_disk_stat(node, istat)            (node->i_ops->viop_disk_stat(node, istat))
 #define viop_lookup(parent, sub_dentry)        (parent->i_ops->viop_lookup(parent, sub_dentry))
+#define viop_readdir(dir_vinode, dir, offset)  (dir_vinode->i_ops->viop_readdir(dir_vinode, dir, offset))
+#define viop_mkdir(dir, sub_dentry)            (dir->i_ops->viop_mkdir(dir, sub_dentry))
 #define viop_write_back_vinode(node)           (node->i_ops->viop_write_back_vinode(node))
 
 // vinode hash table

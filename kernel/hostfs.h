@@ -30,6 +30,8 @@ int hostfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence,
                   int *offset);
 int hostfs_hook_open(struct vinode *f_inode, struct dentry *f_dentry);
 int hostfs_hook_close(struct vinode *f_inode, struct dentry *dentry);
+int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset);
+struct vinode *hostfs_mkdir(struct vinode *parent, struct dentry *sub_dentry);
 struct super_block *hostfs_get_superblock(struct device *dev);
 
 extern const struct vinode_ops hostfs_node_ops;

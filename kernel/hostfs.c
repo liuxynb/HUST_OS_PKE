@@ -22,6 +22,10 @@ const struct vinode_ops hostfs_i_ops = {
     .viop_hook_close = hostfs_hook_close,
 
     .viop_write_back_vinode = hostfs_write_back_vinode,
+
+    // not implemented
+    .viop_readdir = hostfs_readdir,
+    .viop_mkdir = hostfs_mkdir,
 };
 
 /**** hostfs utility functions ****/
@@ -227,6 +231,16 @@ int hostfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence,
   if (*offset >= 0)
     return 0;
   return -1;
+}
+
+int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
+  panic("hostfs_readdir not implemented!\n");
+  return -1;
+}
+
+struct vinode *hostfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
+  panic("hostfs_mkdir not implemented!\n");
+  return NULL;
 }
 
 /**** vfs-hostfs hook interface functions ****/

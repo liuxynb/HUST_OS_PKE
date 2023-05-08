@@ -42,6 +42,11 @@ typedef unsigned long size_t;
 
 #define MAX_FILE_NAME_LEN 32
 
+struct dir {
+  char name[MAX_FILE_NAME_LEN];
+  int inum;
+};
+
 struct istat {
   int st_inum;
   int st_size;

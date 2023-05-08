@@ -297,6 +297,113 @@ int vfs_close(struct file *file) {
 }
 
 //
+// open a dir at vfs layer. the directory must exist on disk.
+//
+struct file *vfs_opendir(const char *path) {
+  struct dentry *parent = vfs_root_dentry;
+  char miss_name[MAX_PATH_LEN];
+
+  // lookup the dir
+  struct dentry *file_dentry = lookup_final_dentry(path, &parent, miss_name);
+
+  if (!file_dentry || file_dentry->dentry_inode->type != DIR_I) {
+    sprint("vfs_opendir: cannot find the direntry!\n");
+    return NULL;
+  }
+
+  // allocate a vfs file with readable/non-writable flag.
+  struct file *file = alloc_vfs_file(file_dentry, 1, 0, 0);
+
+  // additional open direntry operations for a specific file system
+  // rfs needs duild dir cache.
+  if (file_dentry->dentry_inode->i_ops->viop_hook_opendir) {
+    if (file_dentry->dentry_inode->i_ops->
+        viop_hook_opendir(file_dentry->dentry_inode, file_dentry) != 0) {
+      sprint("vfs_opendir: hook opendir failed!\n");
+    }
+  }
+
+  return file;
+}
+
+//
+// read a direntry entry from a direntry specified by "file"
+// the read direntry entry is stored in "dir"
+//
+int vfs_readdir(struct file *file, struct dir *dir) {
+  if (file->f_dentry->dentry_inode->type != DIR_I) {
+    sprint("vfs_readdir: cannot read a file!\n");
+    return -1;
+  }
+  return viop_readdir(file->f_dentry->dentry_inode, dir, &(file->offset));
+}
+
+//
+// make a new directory specified by "path" at vfs layer.
+// note that only the last level directory of the path will be created,
+// and its parent directory must exist.
+//
+int vfs_mkdir(const char *path) {
+  struct dentry *parent = vfs_root_dentry;
+  char miss_name[MAX_PATH_LEN];
+
+  // lookup the dir, find its parent direntry
+  struct dentry *file_dentry = lookup_final_dentry(path, &parent, miss_name);
+  if (file_dentry) {
+    sprint("vfs_mkdir: the directory already exists!\n");
+    return -1;
+  }
+
+  char basename[MAX_PATH_LEN];
+  get_base_name(path, basename);
+  if (strcmp(miss_name, basename) != 0) {
+    sprint("vfs_mkdir: cannot create directory in a non-exist directory!\n");
+    return -1;
+  }
+
+  // do real mkdir
+  struct dentry *new_dentry = alloc_vfs_dentry(basename, NULL, parent);
+  struct vinode *new_dir_inode = viop_mkdir(parent->dentry_inode, new_dentry);
+  if (!new_dir_inode) {
+    free_page(new_dentry);
+    sprint("vfs_mkdir: cannot create directory!\n");
+    return -1;
+  }
+
+  new_dentry->dentry_inode = new_dir_inode;
+  new_dir_inode->ref++;
+  hash_put_dentry(new_dentry);
+  hash_put_vinode(new_dir_inode);
+  return 0;
+}
+
+//
+// close a directory at vfs layer
+//
+int vfs_closedir(struct file *file) {
+  if (file->f_dentry->dentry_inode->type != DIR_I) {
+    sprint("vfs_closedir: cannot close a file!\n");
+    return -1;
+  }
+
+  // even if a directory is no longer referenced, it will not be freed because
+  // it will serve as a cache for later lookup operations on it or its
+  // descendants
+  file->f_dentry->d_ref--;
+  file->status = FD_NONE;
+
+  // additional close direntry operations for a specific file system
+  // rfs needs reclaim dir cache.
+  if (file->f_dentry->dentry_inode->i_ops->viop_hook_closedir) {
+    if (file->f_dentry->dentry_inode->i_ops->
+        viop_hook_closedir(file->f_dentry->dentry_inode, file->f_dentry) != 0) {
+      sprint("vfs_closedir: hook closedir failed!\n");
+    }
+  }
+  return 0;
+}
+
+//
 // lookup the "path" and return its dentry (or NULL if not found).
 // the lookup starts from parent, and stop till the full "path" is parsed.
 // return: the final dentry if we find it, NULL for otherwise.

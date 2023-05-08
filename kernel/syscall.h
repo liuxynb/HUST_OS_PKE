@@ -22,6 +22,11 @@
 #define SYS_user_stat (SYS_user_base + 21)
 #define SYS_user_disk_stat (SYS_user_base + 22)
 #define SYS_user_close (SYS_user_base + 23)
+// added @lab4_2
+#define SYS_user_opendir  (SYS_user_base + 24)
+#define SYS_user_readdir  (SYS_user_base + 25)
+#define SYS_user_mkdir    (SYS_user_base + 26)
+#define SYS_user_closedir (SYS_user_base + 27)
 
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long a7);
 

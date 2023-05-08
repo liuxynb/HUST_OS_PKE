@@ -16,6 +16,11 @@ int do_stat(int fd, struct istat *istat);
 int do_disk_stat(int fd, struct istat *istat);
 int do_close(int fd);
 
+int do_opendir(char *pathname);
+int do_readdir(int fd, struct dir *dir);
+int do_mkdir(char *pathname);
+int do_closedir(int fd);
+
 void fs_init(void);
 
 // data structure that manages all openned files in a PCB

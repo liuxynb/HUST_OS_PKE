@@ -23,4 +23,10 @@ int stat_u(int fd, struct istat *istat);
 int disk_stat_u(int fd, struct istat *istat);
 int close(int fd);
 
+// added @ lab4_2
+int opendir_u(const char *pathname);
+int readdir_u(int fd, struct dir *dir);
+int mkdir_u(const char *pathname);
+int closedir_u(int fd);
+
 #endif

@@ -120,6 +120,34 @@ int disk_stat_u(int fd, struct istat *istat) {
 }
 
 //
+// lib call to open dir
+//
+int opendir_u(const char *dirname) {
+  return do_user_call(SYS_user_opendir, (uint64)dirname, 0, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to read dir
+//
+int readdir_u(int fd, struct dir *dir) {
+  return do_user_call(SYS_user_readdir, fd, (uint64)dir, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to make dir
+//
+int mkdir_u(const char *pathname) {
+  return do_user_call(SYS_user_mkdir, (uint64)pathname, 0, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to close dir
+//
+int closedir_u(int fd) {
+  return do_user_call(SYS_user_closedir, fd, 0, 0, 0, 0, 0, 0);
+} 
+
+//
 // lib call to close
 //
 int close(int fd) {

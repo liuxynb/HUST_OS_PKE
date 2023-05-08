@@ -160,3 +160,50 @@ int do_close(int fd) {
   struct file *pfile = get_opened_file(fd);
   return vfs_close(pfile);
 }
+
+//
+// open a directory
+// return: the fd of the directory file
+//
+int do_opendir(char *pathname) {
+  struct file *opened_file = NULL;
+  if ((opened_file = vfs_opendir(pathname)) == NULL) return -1;
+
+  int fd = 0;
+  struct file *pfile;
+  for (fd = 0; fd < MAX_FILES; ++fd) {
+    pfile = &(current->pfiles->opened_files[fd]);
+    if (pfile->status == FD_NONE) break;
+  }
+  if (pfile->status != FD_NONE)  // no free entry
+    panic("do_opendir: no file entry for current process!\n");
+
+  // initialize this file structure
+  memcpy(pfile, opened_file, sizeof(struct file));
+
+  ++current->pfiles->nfiles;
+  return fd;
+}
+
+//
+// read a directory entry
+//
+int do_readdir(int fd, struct dir *dir) {
+  struct file *pfile = get_opened_file(fd);
+  return vfs_readdir(pfile, dir);
+}
+
+//
+// make a new directory
+//
+int do_mkdir(char *pathname) {
+  return vfs_mkdir(pathname);
+}
+
+//
+// close a directory
+//
+int do_closedir(int fd) {
+  struct file *pfile = get_opened_file(fd);
+  return vfs_closedir(pfile);
+}

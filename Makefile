@@ -68,7 +68,7 @@ USER_CPPS 		:= user/*.c
 USER_CPPS  		:= $(wildcard $(USER_CPPS))
 USER_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CPPS)))
 
-USER_TARGET 	:= $(OBJ_DIR)/app_file
+USER_TARGET 	:= $(OBJ_DIR)/app_directory
 #------------------------targets------------------------
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	

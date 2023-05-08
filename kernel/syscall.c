@@ -166,6 +166,37 @@ ssize_t sys_user_close(int fd) {
 }
 
 //
+// lib call to opendir
+//
+ssize_t sys_user_opendir(char * pathva){
+  char * pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
+  return do_opendir(pathpa);
+}
+
+//
+// lib call to readdir
+//
+ssize_t sys_user_readdir(int fd, struct dir *vdir){
+  struct dir * pdir = (struct dir *)user_va_to_pa((pagetable_t)(current->pagetable), vdir);
+  return do_readdir(fd, pdir);
+}
+
+//
+// lib call to mkdir
+//
+ssize_t sys_user_mkdir(char * pathva){
+  char * pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
+  return do_mkdir(pathpa);
+}
+
+//
+// lib call to closedir
+//
+ssize_t sys_user_closedir(int fd){
+  return do_closedir(fd);
+}
+
+//
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
@@ -199,6 +230,15 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_disk_stat(a1, (struct istat *)a2);
     case SYS_user_close:
       return sys_user_close(a1);
+    // added @lab4_2
+    case SYS_user_opendir:
+      return sys_user_opendir((char *)a1);
+    case SYS_user_readdir:
+      return sys_user_readdir(a1, (struct dir *)a2);
+    case SYS_user_mkdir:
+      return sys_user_mkdir((char *)a1);
+    case SYS_user_closedir:
+      return sys_user_closedir(a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }
