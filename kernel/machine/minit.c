@@ -6,7 +6,7 @@
 #include "kernel/riscv.h"
 #include "kernel/config.h"
 #include "spike_interface/spike_utils.h"
-
+#include "uart.h"
 //
 // global variables are placed in the .data section.
 // stack0 is the privilege mode stack(s) of the proxy kernel on CPU(s)
@@ -77,6 +77,26 @@ static void delegate_traps() {
 }
 
 //
+// setup the Physical Memory Protection mechanism. the purpose is to make PKE runable on
+// both Spike and Zedboard (especially Zedboard). the function is borrowed from PK.
+// added @lab5_1.
+//
+void setup_pmp(void) {
+  // Set up a PMP to permit access to all of memory.
+  // Ignore the illegal-instruction trap if PMPs aren't supported.
+  uintptr_t pmpc = PMP_NAPOT | PMP_R | PMP_W | PMP_X;
+  asm volatile(
+      "la t0, 1f\n\t"
+      "csrrw t0, mtvec, t0\n\t"
+      "csrw pmpaddr0, %1\n\t"
+      "csrw pmpcfg0, %0\n\t"
+      ".align 2\n\t"
+      "1: csrw mtvec, t0"
+      :
+      : "r"(pmpc), "r"(-1UL)
+      : "t0");
+}
+//
 // enabling timer interrupt (irq) in Machine mode. added @lab1_3
 //
 void timerinit(uintptr_t hartid) {
@@ -95,11 +115,21 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
   // functions with "spike_" prefix are all defined in codes under spike_interface/,
   // sprint is also defined in spike_interface/spike_utils.c
   spike_file_init();
+  // query_uart is added @lab5_1
+  query_uart(dtb);
   sprint("In m_start, hartid:%d\n", hartid);
 
   // init HTIF (Host-Target InterFace) and memory by using the Device Table Blob (DTB)
   // init_dtb() is defined above.
   init_dtb(dtb);
+
+  // following code block is added @lab5_1
+  setup_pmp();
+  extern char smode_trap_vector;
+  write_csr(stvec, (uint64)smode_trap_vector);
+  write_csr(sscratch, 0);
+  write_csr(sie, 0);
+  set_csr(sstatus, SSTATUS_SUM | SSTATUS_FS);
 
   // save the address of trap frame for interrupt in M mode to "mscratch". added @lab1_2
   write_csr(mscratch, &g_itrframe);

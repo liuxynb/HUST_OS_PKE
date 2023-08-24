@@ -97,3 +97,21 @@ void fdt_scan(uint64 fdt, const struct fdt_cb *cb) {
 
   fdt_scan_helper(lex, strings, 0, cb);
 }
+
+// following two functions are added @lab5_1
+uint32 fdt_get_value(const struct fdt_scan_prop *prop, uint32 index) {
+  return bswap(prop->value[index]);
+}
+
+int fdt_string_list_index(const struct fdt_scan_prop *prop, const char *str)
+{
+  const char *list = (const char *)prop->value;
+  const char *end = list + prop->len;
+  int index = 0;
+  while (end - list > 0) {
+    if (!strcmp(list, str)) return index;
+    ++index;
+    list += strlen(list) + 1;
+  }
+  return -1;
+}

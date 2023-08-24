@@ -133,6 +133,10 @@ void kern_vm_init(void) {
 
   sprint("KERN_BASE 0x%lx\n", lookup_pa(t_page_dir, KERN_BASE));
 
+  // map IO space @lab5_1
+  kern_vm_map(t_page_dir, (uint64)0x60000000, (uint64)0x60000000, (uint64)0x60020000 - (uint64)0x60000000,
+         prot_to_type(PROT_READ | PROT_WRITE, 0));
+
   // also (direct) map remaining address space, to make them accessable from kernel.
   // this is important when kernel needs to access the memory content of user's app
   // without copying pages between kernel and user spaces.

@@ -214,6 +214,38 @@ ssize_t sys_user_unlink(char * vfn){
 }
 
 //
+// implement the SYS_user_uart_putchar syscall. added @lab5_1
+//
+void sys_user_uart_putchar(uint8 ch) {
+  volatile uint32 *status = (void*)(uintptr_t)0x60000008;
+  volatile uint32 *tx = (void*)(uintptr_t)0x60000004;
+  while (*status & 0x00000008);
+  *tx = ch;
+}
+
+// added @lab5_1
+ssize_t sys_user_uart_getchar() {
+  // TODO (lab5_1 and lab5_2): implment the syscall of sys_user_uart_getchar and modify it in lab5_2.
+  // hint (lab5_1): the functionality of sys_user_uart_getchar is to get data from UART address.
+  // therefore, we should let a pointer point, insert it in 
+  // the rear of ready queue, and finally, schedule a READY process to run.
+  // hint (lab5_2): the functionality of sys_user_uart_getchar is let process sleep
+  // and register a callback function to handle system call return value.
+  // therefore, we should call do_sleep to let process 0 sleep. 
+  // Note that the do_sleep function will never return, and the function passed to do_sleep
+  // will be called in do_wake.
+  panic( "You have to implement sys_user_uart_getchar to get data from UART using uartgetchar in lab5_1 and modify it in lab5_2.\n" );
+}
+
+// used for car control. added @lab5_1
+void sys_user_uart2_putchar(uint8 ch) {
+  volatile uint32 *status = (void*)(uintptr_t)0x60001008;
+  volatile uint32 *tx = (void*)(uintptr_t)0x60001004;
+  while (*status & 0x00000008);
+  *tx = ch;
+}
+
+//
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
@@ -261,6 +293,13 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_link((char *)a1, (char *)a2);
     case SYS_user_unlink:
       return sys_user_unlink((char *)a1);
+    // following 3 cases are added @lab5_1
+    case SYS_user_uart_putchar:
+      sys_user_uart_putchar(a1);return 1;
+    case SYS_user_uart_getchar:
+      return sys_user_uart_getchar();
+    case SYS_user_uart2_putchar:
+	    sys_user_uart2_putchar(a1);return 1;
     default:
       panic("Unknown syscall %ld \n", a0);
   }

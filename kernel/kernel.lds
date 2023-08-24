@@ -14,7 +14,10 @@ SECTIONS
   /* Begining of code and text segment, starts from DRAM_BASE to be effective before enabling paging */
   . = 0x80000000;
   _ftext = .;
-
+  .text :
+  {
+    *(.text.init)
+  }
   /* text: Program code section */
   .text : 
   {

@@ -9,6 +9,7 @@
 #include "util/types.h"
 #include "util/snprintf.h"
 #include "kernel/syscall.h"
+#include "util/string.h"
 
 uint64 do_user_call(uint64 sysnum, uint64 a1, uint64 a2, uint64 a3, uint64 a4, uint64 a5, uint64 a6,
                  uint64 a7) {
@@ -166,4 +167,44 @@ int unlink_u(const char *fn){
 //
 int close(int fd) {
   return do_user_call(SYS_user_close, fd, 0, 0, 0, 0, 0, 0);
+}
+
+//
+// add syscalls for uart IO @lab5_1
+// applications need to call uart_putchar to output a char to device
+//
+int uartputchar(char ch) {
+  return do_user_call(SYS_user_uart_putchar, ch, 0, 0, 0, 0, 0, 0);
+}
+
+//
+// applications need to call uart_getchar to get a char from device
+//
+int uartgetchar() {
+  return do_user_call(SYS_user_uart_getchar, 0, 0, 0, 0, 0, 0, 0);
+}
+
+// car
+int uart2putchar(char ch) {
+  return do_user_call(SYS_user_uart2_putchar, ch, 0, 0, 0, 0, 0, 0);
+}
+
+void car_control(char val) {
+  char cmd[80];
+  if(val == '1') //front
+	  strcpy(cmd, "#006P2500T0000!#007P0500T0000!#008P2500T0000!#009P0500T0000!");
+  else if(val == '2') //back
+	  strcpy(cmd, "#006P0500T0000!#007P2500T0000!#008P0500T0000!#009P2500T0000!");
+  else if(val == '3') //left
+	  strcpy(cmd, "#006P0500T0000!#007P0500T0000!#008P0500T0000!#009P0500T0000!");
+  else if(val == '4') //right
+	  strcpy(cmd, "#006P2500T0000!#007P2500T0000!#008P2500T0000!#009P2500T0000!");
+  else if(val == '0') //stop
+	  strcpy(cmd, "#006P1500T0000!#007P1500T0000!#008P1500T0000!#009P1500T0000!");
+  else
+	  strcpy(cmd, "");
+
+  int i;
+  for(i = 0; i < strlen(cmd); i++)
+	  uart2putchar(cmd[i]);
 }

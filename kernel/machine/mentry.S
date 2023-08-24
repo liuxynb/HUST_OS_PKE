@@ -9,7 +9,8 @@
 # [a1] = pointer to the DTS (i.e., Device Tree String), which is stored in the memory of
 # RISC-V guest computer emulated by spike.
 #
-
+.option norvc
+.section .text.init,"ax",@progbits
 .globl _mentry
 _mentry:
     # [mscratch] = 0; mscratch points the stack bottom of machine mode computer
