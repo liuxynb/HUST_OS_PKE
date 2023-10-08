@@ -13,10 +13,10 @@
 #define MSTATUS_MPIE (1L << 7)      // preserve MIE bit
 
 // values of mcause, the Machine Cause register
-#define IRQ_S_EXT 9                 // s-mode external interrupt
-#define IRQ_S_TIMER 5               // s-mode timer interrupt
-#define IRQ_S_SOFT 1                // s-mode software interrupt
-#define IRQ_M_SOFT 3                // m-mode software interrupt
+#define IRQ_S_EXT 9   // s-mode external interrupt
+#define IRQ_S_TIMER 5 // s-mode timer interrupt
+#define IRQ_S_SOFT 1  // s-mode software interrupt
+#define IRQ_M_SOFT 3  // m-mode software interrupt
 
 // fields of mip, the Machine Interrupt Pending register
 #define MIP_SEIP (1 << IRQ_S_EXT)   // s-mode external interrupt pending
@@ -37,20 +37,20 @@
 #define PMP_NAPOT 0x18
 
 // exceptions
-#define CAUSE_MISALIGNED_FETCH 0x0     // Instruction address misaligned
-#define CAUSE_FETCH_ACCESS 0x1         // Instruction access fault
-#define CAUSE_ILLEGAL_INSTRUCTION 0x2  // Illegal Instruction
-#define CAUSE_BREAKPOINT 0x3           // Breakpoint
-#define CAUSE_MISALIGNED_LOAD 0x4      // Load address misaligned
-#define CAUSE_LOAD_ACCESS 0x5          // Load access fault
-#define CAUSE_MISALIGNED_STORE 0x6     // Store/AMO address misaligned
-#define CAUSE_STORE_ACCESS 0x7         // Store/AMO access fault
-#define CAUSE_USER_ECALL 0x8           // Environment call from U-mode
-#define CAUSE_SUPERVISOR_ECALL 0x9     // Environment call from S-mode
-#define CAUSE_MACHINE_ECALL 0xb        // Environment call from M-mode
-#define CAUSE_FETCH_PAGE_FAULT 0xc     // Instruction page fault
-#define CAUSE_LOAD_PAGE_FAULT 0xd      // Load page fault
-#define CAUSE_STORE_PAGE_FAULT 0xf     // Store/AMO page fault
+#define CAUSE_MISALIGNED_FETCH 0x0    // Instruction address misaligned
+#define CAUSE_FETCH_ACCESS 0x1        // Instruction access fault
+#define CAUSE_ILLEGAL_INSTRUCTION 0x2 // Illegal Instruction 交给M模式处理
+#define CAUSE_BREAKPOINT 0x3          // Breakpoint
+#define CAUSE_MISALIGNED_LOAD 0x4     // Load address misaligned
+#define CAUSE_LOAD_ACCESS 0x5         // Load access fault
+#define CAUSE_MISALIGNED_STORE 0x6    // Store/AMO address misaligned
+#define CAUSE_STORE_ACCESS 0x7        // Store/AMO access fault
+#define CAUSE_USER_ECALL 0x8          // Environment call from U-mode
+#define CAUSE_SUPERVISOR_ECALL 0x9    // Environment call from S-mode
+#define CAUSE_MACHINE_ECALL 0xb       // Environment call from M-mode
+#define CAUSE_FETCH_PAGE_FAULT 0xc    // Instruction page fault
+#define CAUSE_LOAD_PAGE_FAULT 0xd     // Load page fault
+#define CAUSE_STORE_PAGE_FAULT 0xf    // Store/AMO page fault
 
 // irqs (interrupts). added @lab1_3
 #define CAUSE_MTIMER 0x8000000000000007
@@ -65,23 +65,23 @@
 #define CLINT_MTIME (CLINT + 0xBFF8)  // cycles since boot.
 
 // fields of sstatus, the Supervisor mode Status register
-#define SSTATUS_SPP (1L << 8)   // Previous mode, 1=Supervisor, 0=User
-#define SSTATUS_SPIE (1L << 5)  // Supervisor Previous Interrupt Enable
-#define SSTATUS_UPIE (1L << 4)  // User Previous Interrupt Enable
-#define SSTATUS_SIE (1L << 1)   // Supervisor Interrupt Enable
-#define SSTATUS_UIE (1L << 0)   // User Interrupt Enable
+#define SSTATUS_SPP (1L << 8)  // Previous mode, 1=Supervisor, 0=User
+#define SSTATUS_SPIE (1L << 5) // Supervisor Previous Interrupt Enable
+#define SSTATUS_UPIE (1L << 4) // User Previous Interrupt Enable
+#define SSTATUS_SIE (1L << 1)  // Supervisor Interrupt Enable
+#define SSTATUS_UIE (1L << 0)  // User Interrupt Enable
 #define SSTATUS_SUM 0x00040000
 #define SSTATUS_FS 0x00006000
 
 // Supervisor Interrupt Enable
-#define SIE_SEIE (1L << 9)  // external
-#define SIE_STIE (1L << 5)  // timer
-#define SIE_SSIE (1L << 1)  // software
+#define SIE_SEIE (1L << 9) // external
+#define SIE_STIE (1L << 5) // timer
+#define SIE_SSIE (1L << 1) // software
 
 // Machine-mode Interrupt Enable
-#define MIE_MEIE (1L << 11)  // external
-#define MIE_MTIE (1L << 7)   // timer
-#define MIE_MSIE (1L << 3)   // software
+#define MIE_MEIE (1L << 11) // external
+#define MIE_MTIE (1L << 7)  // timer
+#define MIE_MSIE (1L << 3)  // software
 
 #define read_const_csr(reg)              \
   ({                                     \
@@ -90,7 +90,8 @@
     __tmp;                               \
   })
 
-static inline int supports_extension(char ext) {
+static inline int supports_extension(char ext)
+{
   return read_const_csr(misa) & (1 << (ext - 'A'));
 }
 
@@ -124,21 +125,24 @@ static inline void intr_on(void) { write_csr(sstatus, read_csr(sstatus) | SSTATU
 static inline void intr_off(void) { write_csr(sstatus, read_csr(sstatus) & ~SSTATUS_SIE); }
 
 // are device interrupts enabled?
-static inline int is_intr_enable(void) {
+static inline int is_intr_enable(void)
+{
   //  uint64 x = r_sstatus();
   uint64 x = read_csr(sstatus);
   return (x & SSTATUS_SIE) != 0;
 }
 
 // read sp, the stack pointer
-static inline uint64 read_sp(void) {
+static inline uint64 read_sp(void)
+{
   uint64 x;
   asm volatile("mv %0, sp" : "=r"(x));
   return x;
 }
 
 // read tp, the thread pointer, holding hartid (core number), the index into cpus[].
-static inline uint64 read_tp(void) {
+static inline uint64 read_tp(void)
+{
   uint64 x;
   asm volatile("mv %0, tp" : "=r"(x));
   return x;
@@ -147,7 +151,8 @@ static inline uint64 read_tp(void) {
 // write tp, the thread pointer, holding hartid (core number), the index into cpus[].
 static inline void write_tp(uint64 x) { asm volatile("mv tp, %0" : : "r"(x)); }
 
-typedef struct riscv_regs_t {
+typedef struct riscv_regs_t
+{
   /*  0  */ uint64 ra;
   /*  8  */ uint64 sp;
   /*  16 */ uint64 gp;
@@ -179,6 +184,6 @@ typedef struct riscv_regs_t {
   /* 224 */ uint64 t4;
   /* 232 */ uint64 t5;
   /* 240 */ uint64 t6;
-}riscv_regs;
+} riscv_regs;
 
 #endif
