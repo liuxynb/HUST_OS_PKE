@@ -18,8 +18,7 @@ static void handle_syscall(trapframe *tf)
   // for a syscall, we should return to the NEXT instruction after its handling.
   // in RV64G, each instruction occupies exactly 32 bits (i.e., 4 Bytes)
   tf->epc += 4;
-  do_syscall(tf->regs.a0, tf->regs.a1, tf->regs.a2, tf->regs.a3, tf->regs.a4, tf->regs.a5, tf->regs.a6, tf->regs.a7);
-
+  tf->regs.a0 = do_syscall(tf->regs.a0, tf->regs.a1, tf->regs.a2, tf->regs.a3, tf->regs.a4, tf->regs.a5, tf->regs.a6, tf->regs.a7);
   // TODO (lab1_1): remove the panic call below, and call do_syscall (defined in
   // kernel/syscall.c) to conduct real operations of the kernel side for a syscall.
   // IMPORTANT: return value should be returned to user app, or else, you will encounter
