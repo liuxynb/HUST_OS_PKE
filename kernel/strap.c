@@ -46,6 +46,12 @@ void handle_mtimer_trap()
   // panic( "lab1_3: increase g_ticks by one, and clear SIP field in sip register.\n" );
 }
 
+// Function to check if the faulting address is a reasonable stack growth
+int is_stack_growth(uint64 faulting_address)
+{
+  return (faulting_address >= current->trapframe->regs.sp - PGSIZE); // The stack grows from high to low
+}
+
 //
 // the page fault handler. added @lab2_3. parameters:
 // sepc: the pc when fault happens;
@@ -58,15 +64,21 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
   switch (mcause)
   {
   case CAUSE_STORE_PAGE_FAULT:
-    // TODO (lab2_3): implement the operations that solve the page fault to
-    // dynamically increase application stack.
-    // hint: first allocate a new physical page, and then, maps the new page to the
-    // virtual address that causes the page fault.
-    // panic("You need to implement the operations that actually handle the page fault in lab2_3.\n");
-    pa = (uint64)alloc_page(); // allocate a new physical page
+    // Allocate a new physical page
+    pa = (uint64)alloc_page();
     if ((void *)pa == NULL)
-      panic("Can not allocate a new physical page.\n");
-    map_pages(current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, pa, prot_to_type(PROT_READ | PROT_WRITE, 1)); // maps the new page to the virtual address that causes the page fault
+      panic("Cannot allocate a new physical page.\n"); // Map the page to the faulting address
+    // Check if the faulting address is within a reasonable range to be considered stack growth
+    if (is_stack_growth(stval))
+    {
+      map_pages(current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, pa,
+                prot_to_type(PROT_READ | PROT_WRITE, 1));
+    }
+    else
+    {
+      // If the address is not within a reasonable stack range, panic and halt the system
+      panic("this address is not available!");
+    }
     break;
   default:
     sprint("unknown page fault.\n");
