@@ -257,6 +257,16 @@ int do_fork(process *parent)
                   prot_to_type(PROT_READ | PROT_EXEC, 1));
       sprint("do_folk map code segment at pa:0x%lx of parent to child at va:0x%lx.\n", lookup_pa(parent->pagetable, parent->mapped_info[CODE_SEGMENT].va), parent->mapped_info[CODE_SEGMENT].va);
       break;
+      // for (int j = 0; j < parent->mapped_info[i].npages; j++)
+      // {
+      //   uint64 addr = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
+
+      //   map_pages(child->pagetable, parent->mapped_info[i].va + j * PGSIZE, PGSIZE,
+      //             addr, prot_to_type(PROT_WRITE | PROT_READ | PROT_EXEC, 1));
+
+      //   sprint("do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
+      //          addr, parent->mapped_info[i].va + j * PGSIZE);
+      // }
     }
     }
     // after mapping, register the vm region (do not delete codes below!)
