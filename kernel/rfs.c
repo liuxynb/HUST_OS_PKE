@@ -635,14 +635,16 @@ int rfs_disk_stat(struct vinode *vinode, struct istat *istat)
 // when a directory is opened, the contents of the directory file are read
 // into the memory for directory read operations
 //
-int rfs_hook_opendir(struct vinode *dir_vinode, struct dentry *dentry) {
+int rfs_hook_opendir(struct vinode *dir_vinode, struct dentry *dentry)
+{
   // allocate space and read the contents of the dir block into memory
   void *pdire = NULL;
   void *previous = NULL;
   struct rfs_device *rdev = rfs_device_list[dir_vinode->sb->s_dev->dev_id];
 
   // read-in the directory file, store all direntries in dir cache.
-  for (int i = dir_vinode->blocks - 1; i >= 0; i--) {
+  for (int i = dir_vinode->blocks - 1; i >= 0; i--)
+  {
     previous = pdire;
     pdire = alloc_page();
 
@@ -667,12 +669,14 @@ int rfs_hook_opendir(struct vinode *dir_vinode, struct dentry *dentry) {
 // when a directory is closed, the memory space allocated for the directory
 // block is freed
 //
-int rfs_hook_closedir(struct vinode *dir_vinode, struct dentry *dentry) {
+int rfs_hook_closedir(struct vinode *dir_vinode, struct dentry *dentry)
+{
   struct rfs_dir_cache *dir_cache =
       (struct rfs_dir_cache *)dir_vinode->i_fs_info;
 
   // reclaim the dir cache
-  for (int i = 0; i < dir_cache->block_count; ++i) {
+  for (int i = 0; i < dir_cache->block_count; ++i)
+  {
     free_page((char *)dir_cache->dir_base_addr + i * RFS_BLKSIZE);
   }
   return 0;
@@ -684,12 +688,14 @@ int rfs_hook_closedir(struct vinode *dir_vinode, struct dentry *dentry) {
 // if offset is 1, the second entry is read, and so on.
 // return: 0 on success, -1 when there are no more entry (end of the list).
 //
-int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
+int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset)
+{
   int total_direntrys = dir_vinode->size / sizeof(struct rfs_direntry);
   int one_block_direntrys = RFS_BLKSIZE / sizeof(struct rfs_direntry);
 
   int direntry_index = *offset;
-  if (direntry_index >= total_direntrys) {
+  if (direntry_index >= total_direntrys)
+  {
     // no more direntry
     return -1;
   }
@@ -706,8 +712,9 @@ int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
   // the method of returning is to popular proper members of "dir", more specifically,
   // dir->name and dir->inum.
   // note: DO NOT DELETE CODE BELOW PANIC.
-  panic("You need to implement the code for reading a directory entry of rfs in lab4_2.\n" );
-
+  // panic("You need to implement the code for reading a directory entry of rfs in lab4_2.\n" );
+  strcpy(dir->name, p_direntry->name);
+  dir->inum = p_direntry->inum;
   // DO NOT DELETE CODE BELOW.
   (*offset)++;
   return 0;
@@ -717,15 +724,18 @@ int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
 // make a new direntry named "sub_dentry->name" under the directory "parent",
 // return the vfs inode of subdir being created.
 //
-struct vinode *rfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
+struct vinode *rfs_mkdir(struct vinode *parent, struct dentry *sub_dentry)
+{
   struct rfs_device *rdev = rfs_device_list[parent->sb->s_dev->dev_id];
 
   // ** find a free disk inode to store the file that is going to be created
   struct rfs_dinode *free_dinode = NULL;
   int free_inum = 0;
-  for (int i = 0; i < (RFS_BLKSIZE / RFS_INODESIZE * RFS_MAX_INODE_BLKNUM); i++) {
+  for (int i = 0; i < (RFS_BLKSIZE / RFS_INODESIZE * RFS_MAX_INODE_BLKNUM); i++)
+  {
     free_dinode = rfs_read_dinode(rdev, i);
-    if (free_dinode->type == R_FREE) {  // found
+    if (free_dinode->type == R_FREE)
+    { // found
       free_inum = i;
       break;
     }
@@ -733,7 +743,7 @@ struct vinode *rfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
   }
 
   if (free_dinode == NULL)
-    panic( "rfs_mkdir: no more free disk inode, we cannot create directory.\n" );
+    panic("rfs_mkdir: no more free disk inode, we cannot create directory.\n");
 
   // initialize the states of the file being created
   free_dinode->size = 0;
@@ -749,7 +759,8 @@ struct vinode *rfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
 
   // ** add a direntry to the directory
   int result = rfs_add_direntry(parent, sub_dentry->name, free_inum);
-  if (result == -1) {
+  if (result == -1)
+  {
     sprint("rfs_mkdir: rfs_add_direntry failed");
     return NULL;
   }
