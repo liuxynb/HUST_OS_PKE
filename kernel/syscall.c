@@ -108,7 +108,14 @@ ssize_t sys_user_yield()
 
 //
 // open file
+// 需要注意，从这里开始,我们所需要处理的路径字符串，比之前要扩充！
 //
+// 从路径字符串形式的角度来看，相对路径的起始处总是为以下两种特殊的目录之一：”.“，”..“。
+// 其中”.“代指进程的当前工作目录，“..”代指进程当前工作目录的父目录。
+// 例如，“./file”的含义为：位于进程当前工作目录下的file文件；
+// “../dir/file”的含义为：当前进程工作目录父目录下的dir目录下的file文件。
+//
+
 ssize_t sys_user_open(char *pathva, int flags)
 {
   char *pathpa = (char *)user_va_to_pa((pagetable_t)(current->pagetable), pathva);
@@ -244,6 +251,22 @@ ssize_t sys_user_unlink(char *vfn)
 }
 
 //
+// lib call to read present working directory (pwd)
+//
+ssize_t sys_user_rcwd(char *path)
+{
+  return do_rewd(path);
+}
+
+//
+// lib call to change pwd
+//
+ssize_t sys_user_ccwd(char *path)
+{
+  return do_ccwd(path);
+}
+
+//
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
@@ -293,6 +316,11 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
     return sys_user_link((char *)a1, (char *)a2);
   case SYS_user_unlink:
     return sys_user_unlink((char *)a1);
+  // added @lab4_challenge1
+  case SYS_user_rcwd:
+    return sys_user_rcwd((char *)a1);
+  case SYS_user_ccwd:
+    return sys_user_ccwd((char *)a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }

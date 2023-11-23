@@ -9,7 +9,7 @@
 #define RFS_TYPE 0
 #define RFS_MAGIC 0xBEAF
 #define RFS_BLKSIZE PGSIZE
-#define RFS_INODESIZE 128  // block size must be divisible by this value
+#define RFS_INODESIZE 128 // block size must be divisible by this value
 #define RFS_MAX_INODE_BLKNUM 10
 #define RFS_MAX_FILE_NAME_LEN 28
 #define RFS_DIRECT_BLKNUM DIRECT_BLKNUM
@@ -26,30 +26,34 @@
 #define R_FREE 2
 
 // file system super block
-struct rfs_superblock {
-  int magic;    // magic number of the
-  int size;     // size of file system image (blocks)
-  int nblocks;  // number of data blocks
-  int ninodes;  // number of inodes.
+struct rfs_superblock
+{
+  int magic;   // magic number of the
+  int size;    // size of file system image (blocks)
+  int nblocks; // number of data blocks
+  int ninodes; // number of inodes.
 };
 
 // disk inode
-struct rfs_dinode {
-  int size;                      // size of the file (in bytes)
-  int type;                      // one of R_FREE, R_FILE, R_DIR
-  int nlinks;                    // number of hard links to this file
-  int blocks;                    // number of blocks
-  int addrs[RFS_DIRECT_BLKNUM];  // direct blocks
+struct rfs_dinode
+{
+  int size;                     // size of the file (in bytes)
+  int type;                     // one of R_FREE, R_FILE, R_DIR
+  int nlinks;                   // number of hard links to this file
+  int blocks;                   // number of blocks
+  int addrs[RFS_DIRECT_BLKNUM]; // direct blocks
 };
 
 // directory entry
-struct rfs_direntry {
-  int inum;                          // inode number
-  char name[RFS_MAX_FILE_NAME_LEN];  // file name
+struct rfs_direntry
+{
+  int inum;                         // inode number
+  char name[RFS_MAX_FILE_NAME_LEN]; // file name
 };
 
 // directory memory cache (used by opendir/readdir/closedir)
-struct rfs_dir_cache {
+struct rfs_dir_cache
+{
   int block_count;
   struct rfs_direntry *dir_base_addr;
 };

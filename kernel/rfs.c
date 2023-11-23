@@ -17,6 +17,8 @@
 #include "spike_interface/spike_utils.h"
 #include "util/string.h"
 #include "vfs.h"
+#include "process.h"
+#include "vmm.h"
 
 /**** vinode inteface ****/
 const struct vinode_ops rfs_i_ops = {
