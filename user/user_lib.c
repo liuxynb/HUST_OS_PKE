@@ -1,7 +1,7 @@
 /*
  * The supporting library for applications.
- * Actually, supporting routines for applications are catalogued as the user 
- * library. we don't do that in PKE to make the relationship between application 
+ * Actually, supporting routines for applications are catalogued as the user
+ * library. we don't do that in PKE to make the relationship between application
  * and user library more straightforward.
  */
 
@@ -11,14 +11,15 @@
 #include "kernel/syscall.h"
 
 int do_user_call(uint64 sysnum, uint64 a1, uint64 a2, uint64 a3, uint64 a4, uint64 a5, uint64 a6,
-                 uint64 a7) {
+                 uint64 a7)
+{
   int ret;
 
   // before invoking the syscall, arguments of do_user_call are already loaded into the argument
   // registers (a0-a7) of our (emulated) risc-v machine.
   asm volatile(
       "ecall\n"
-      "sw a0, %0"  // returns a 32-bit value
+      "sw a0, %0" // returns a 32-bit value
       : "=m"(ret)
       :
       : "memory");
@@ -29,14 +30,15 @@ int do_user_call(uint64 sysnum, uint64 a1, uint64 a2, uint64 a3, uint64 a4, uint
 //
 // printu() supports user/lab1_1_helloworld.c
 //
-int printu(const char* s, ...) {
+int printu(const char *s, ...)
+{
   va_list vl;
   va_start(vl, s);
 
-  char out[256];  // fixed buffer size.
+  char out[256]; // fixed buffer size.
   int res = vsnprintf(out, sizeof(out), s, vl);
   va_end(vl);
-  const char* buf = out;
+  const char *buf = out;
   size_t n = res < sizeof(out) ? res : sizeof(out);
 
   // make a syscall to implement the required functionality.
@@ -46,6 +48,16 @@ int printu(const char* s, ...) {
 //
 // applications need to call exit to quit execution.
 //
-int exit(int code) {
-  return do_user_call(SYS_user_exit, code, 0, 0, 0, 0, 0, 0); 
+int exit(int code)
+{
+  return do_user_call(SYS_user_exit, code, 0, 0, 0, 0, 0, 0);
+}
+
+//
+// applications need to call exit to print backtrace
+//
+void print_backtrace(int num)
+{
+  if (do_user_call(SYS_user_backtrace, num, 0, 0, 0, 0, 0, 0) == -1)
+    printu("failed to backtrace\n");
 }
