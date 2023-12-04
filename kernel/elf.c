@@ -199,7 +199,6 @@ void load_bincode_from_host_elf(process *p)
 //
 //
 // added on @lab1_challenge1
-bool flag = 0;
 elf_status elf_print_name(uint64 ra, int *current_depth, int depth)
 {
   // for (int i = 0; elfloader.str_table[i] != '0'; i++)
@@ -224,10 +223,8 @@ elf_status elf_print_name(uint64 ra, int *current_depth, int depth)
   if (symbol_index != -1)
   {
     // sprint("%d\n", symbol_idx);
-    if (elfloader.symbol[symbol_index].st_value == 0x81000000)
-      flag = 1;
-    sprint("elfloader.symbol[symbol_index].st_value = 0x%x\n", elfloader.symbol[symbol_index].st_value);
-    if (flag && elfloader.symbol[symbol_index].st_value >= 0x81000000) // exists ???
+    // sprint("elfloader.symbol[symbol_index].st_value = 0x%x\n", elfloader.symbol[symbol_index].st_value);
+    if (elfloader.symbol[symbol_index].st_value >= 0x81000000) // exists ???
     {
       sprint("%s\n", &elfloader.str_table[elfloader.symbol[symbol_index].st_name]);
     }

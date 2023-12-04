@@ -52,6 +52,11 @@ ssize_t sys_user_backtrace(uint64 trace_depth)
     }
     // sprint("backtrace %d: ra = %p, fp = %p\n", current_depth, current_ra, current_fp);
     // sprint("0x%x\n", current_ra);
+    if (current_fp == 0)
+    {
+      current_p += 16;
+      continue;
+    }
     if (elf_print_name(current_ra, &current_depth, trace_depth) == EL_ERR)
     {
       panic("backtrace %d: ra = %p, fp = %p\n", current_depth, current_ra, current_fp);
