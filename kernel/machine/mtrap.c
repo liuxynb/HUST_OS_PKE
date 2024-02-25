@@ -16,7 +16,7 @@ static void handle_misaligned_store() { panic("Misaligned AMO!"); }
 
 // added @lab1_3
 static void handle_timer() {
-  int cpuid = 0;
+  int cpuid = read_csr(mhartid);
   // setup the timer fired at next time (TIMER_INTERVAL from now)
   *(uint64*)CLINT_MTIMECMP(cpuid) = *(uint64*)CLINT_MTIMECMP(cpuid) + TIMER_INTERVAL;
 

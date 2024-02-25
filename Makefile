@@ -63,22 +63,25 @@ SPIKE_INF_LIB   := $(OBJ_DIR)/spike_interface.a
 
 
 #---------------------	user   -----------------------
-USER_LDS  := user/user.lds
-USER_CPPS 		:= user/*.c 
+USER_LDS0  := user/user0.lds
+USER_LDS1  := user/user1.lds
 
-USER_CPPS  		:= $(wildcard $(USER_CPPS))
-USER_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CPPS)))
+USER_CPP0 		:= user/app0.c user/user_lib.c
+USER_CPP1 		:= user/app1.c user/user_lib.c
 
+USER_OBJ0  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CPP0)))
+USER_OBJ1  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CPP1)))
 
-
-USER_TARGET 	:= $(OBJ_DIR)/app_long_loop
+USER_TARGET0 	:= $(OBJ_DIR)/app0
+USER_TARGET1 	:= $(OBJ_DIR)/app1
 #------------------------targets------------------------
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	
 	@-mkdir -p $(dir $(UTIL_OBJS))
 	@-mkdir -p $(dir $(SPIKE_INF_OBJS))
 	@-mkdir -p $(dir $(KERNEL_OBJS))
-	@-mkdir -p $(dir $(USER_OBJS))
+	@-mkdir -p $(dir $(USER_OBJ0))
+	@-mkdir -p $(dir $(USER_OBJ1))
 
 $(OBJ_DIR)/%.o : %.c
 	@echo "compiling" $<
@@ -103,9 +106,14 @@ $(KERNEL_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(SPIKE_INF_LIB) $(KERNEL_OBJS) $(KERNE
 	@$(COMPILE) $(KERNEL_OBJS) $(UTIL_LIB) $(SPIKE_INF_LIB) -o $@ -T $(KERNEL_LDS)
 	@echo "PKE core has been built into" \"$@\"
 
-$(USER_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJS) $(USER_LDS)
+$(USER_TARGET0): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJ0) $(USER_LDS0)
 	@echo "linking" $@	...	
-	@$(COMPILE) $(USER_OBJS) $(UTIL_LIB) -o $@ -T $(USER_LDS)
+	@$(COMPILE) $(USER_OBJ0) $(UTIL_LIB) -o $@ -T $(USER_LDS0)
+	@echo "User app has been built into" \"$@\"
+	
+$(USER_TARGET1): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJ1) $(USER_LDS1)
+	@echo "linking" $@	...	
+	@$(COMPILE) $(USER_OBJ1) $(UTIL_LIB) -o $@ -T $(USER_LDS1)
 	@echo "User app has been built into" \"$@\"
 
 -include $(wildcard $(OBJ_DIR)/*/*.d)
@@ -113,16 +121,16 @@ $(USER_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJS) $(USER_LDS)
 
 .DEFAULT_GOAL := $(all)
 
-all: $(KERNEL_TARGET) $(USER_TARGET)
+all: $(KERNEL_TARGET) $(USER_TARGET0) $(USER_TARGET1)
 .PHONY:all
 
-run: $(KERNEL_TARGET) $(USER_TARGET)
+run: $(KERNEL_TARGET) $(USER_TARGET0) $(USER_TARGET1)
 	@echo "********************HUST PKE********************"
-	spike $(KERNEL_TARGET) $(USER_TARGET)
+	spike -p2 $(KERNEL_TARGET) $(USER_TARGET0) $(USER_TARGET1)
 
 # need openocd!
-gdb:$(KERNEL_TARGET) $(USER_TARGET)
-	spike --rbb-port=9824 -H $(KERNEL_TARGET) $(USER_TARGET) &
+gdb:$(KERNEL_TARGET) $(USER_TARGET0) $(USER_TARGET1)
+	spike --rbb-port=9824 -H -p2 $(KERNEL_TARGET) $(USER_TARGET0) $(USER_TARGET1) &
 	@sleep 1
 	openocd -f ./.spike.cfg &
 	@sleep 1
@@ -136,7 +144,8 @@ gdb_clean:
 
 objdump:
 	riscv64-unknown-elf-objdump -d $(KERNEL_TARGET) > $(OBJ_DIR)/kernel_dump
-	riscv64-unknown-elf-objdump -d $(USER_TARGET) > $(OBJ_DIR)/user_dump
+	riscv64-unknown-elf-objdump -d $(USER_TARGET0) > $(OBJ_DIR)/app0_dump
+	riscv64-unknown-elf-objdump -d $(USER_TARGET1) > $(OBJ_DIR)/app1_dump
 
 cscope:
 	find ./ -name "*.c" > cscope.files
