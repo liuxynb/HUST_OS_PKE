@@ -63,6 +63,6 @@ typedef struct elf_ctx_t {
 elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
-void load_bincode_from_host_elf(process *p);
+void load_bincode_from_host_elf(process *p, char *filename);
 
 #endif

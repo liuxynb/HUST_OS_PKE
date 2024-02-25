@@ -14,6 +14,7 @@ SRC_DIR        	:= .
 OBJ_DIR 		:= obj
 SPROJS_INCLUDE 	:= -I.  
 
+HOSTFS_ROOT := hostfs_root
 ifneq (,)
   march := -march=
   is_32bit := $(findstring 32,$(march))
@@ -63,12 +64,41 @@ SPIKE_INF_LIB   := $(OBJ_DIR)/spike_interface.a
 
 
 #---------------------	user   -----------------------
-USER_CPPS 		:= user/*.c 
+USER_CPPS 		:= user/app_shell.c user/user_lib.c
 
-USER_CPPS  		:= $(wildcard $(USER_CPPS))
 USER_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CPPS)))
 
-USER_TARGET 	:= $(OBJ_DIR)/app_hardlink
+USER_TARGET 	:= $(HOSTFS_ROOT)/bin/app_shell
+
+USER_E_CPPS 		:= user/app_ls.c user/user_lib.c
+
+USER_E_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_E_CPPS)))
+
+USER_E_TARGET 	:= $(HOSTFS_ROOT)/bin/app_ls
+
+USER_M_CPPS 		:= user/app_mkdir.c user/user_lib.c
+
+USER_M_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_M_CPPS)))
+
+USER_M_TARGET 	:= $(HOSTFS_ROOT)/bin/app_mkdir
+
+USER_T_CPPS 		:= user/app_touch.c user/user_lib.c
+
+USER_T_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_T_CPPS)))
+
+USER_T_TARGET 	:= $(HOSTFS_ROOT)/bin/app_touch
+
+USER_C_CPPS 		:= user/app_cat.c user/user_lib.c
+
+USER_C_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_C_CPPS)))
+
+USER_C_TARGET 	:= $(HOSTFS_ROOT)/bin/app_cat
+
+USER_O_CPPS 		:= user/app_echo.c user/user_lib.c
+
+USER_O_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_O_CPPS)))
+
+USER_O_TARGET 	:= $(HOSTFS_ROOT)/bin/app_echo
 #------------------------targets------------------------
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	
@@ -76,7 +106,12 @@ $(OBJ_DIR):
 	@-mkdir -p $(dir $(SPIKE_INF_OBJS))
 	@-mkdir -p $(dir $(KERNEL_OBJS))
 	@-mkdir -p $(dir $(USER_OBJS))
-
+	@-mkdir -p $(dir $(USER_E_OBJS))
+	@-mkdir -p $(dir $(USER_M_OBJS))
+	@-mkdir -p $(dir $(USER_T_OBJS))
+	@-mkdir -p $(dir $(USER_C_OBJS))
+	@-mkdir -p $(dir $(USER_O_OBJS))
+	
 $(OBJ_DIR)/%.o : %.c
 	@echo "compiling" $<
 	@$(COMPILE) -c $< -o $@
@@ -102,7 +137,39 @@ $(KERNEL_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(SPIKE_INF_LIB) $(KERNEL_OBJS) $(KERNE
 
 $(USER_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJS)
 	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
 	@$(COMPILE) --entry=main $(USER_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+	@cp $@ $(OBJ_DIR)
+
+$(USER_E_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_E_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_E_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+
+$(USER_M_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_M_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_M_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+
+$(USER_T_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_T_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_T_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+
+$(USER_C_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_C_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_C_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+
+$(USER_O_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_O_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_O_OBJS) $(UTIL_LIB) -o $@
 	@echo "User app has been built into" \"$@\"
 
 -include $(wildcard $(OBJ_DIR)/*/*.d)
@@ -110,12 +177,12 @@ $(USER_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_OBJS)
 
 .DEFAULT_GOAL := $(all)
 
-all: $(KERNEL_TARGET) $(USER_TARGET)
+all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET)
 .PHONY:all
 
-run: $(KERNEL_TARGET) $(USER_TARGET)
+run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET)
 	@echo "********************HUST PKE********************"
-	spike $(KERNEL_TARGET) $(USER_TARGET)
+	spike $(KERNEL_TARGET) /bin/app_shell
 
 # need openocd!
 gdb:$(KERNEL_TARGET) $(USER_TARGET)
@@ -146,4 +213,4 @@ format:
 	@python ./format.py ./
 
 clean:
-	rm -fr ${OBJ_DIR}
+	rm -fr ${OBJ_DIR} ${HOSTFS_ROOT}/bin
