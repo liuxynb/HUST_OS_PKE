@@ -33,7 +33,7 @@ typedef struct process_t {
   trapframe* trapframe;
 
   // added @lab1_challenge2
-  char *debugline; char **dir; code_file *file; addr_line *line; int line_ind;
+  char *debugline; char **dir; code_file *file; addr_line *line; int line_ind; // debug info, line_ind is the index of the current line
 }process;
 
 void switch_to(process*);

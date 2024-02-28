@@ -13,6 +13,9 @@ typedef struct elf_info_t {
   process *p;
 } elf_info;
 
+// added @lab1_challenge2
+static char debugline[10000]; 
+
 //
 // the implementation of allocater. allocates memory space for later segment loading
 //
@@ -219,6 +222,29 @@ elf_status elf_load(elf_ctx *ctx) {
       return EL_EIO;
   }
 
+
+    // added @lab1_challenge2
+    // load the debug_line section
+    ((elf_info *)ctx->info)->p->debugline = NULL; // initialize the debugline pointer
+    // read the name segment
+    elf_sect_header shstr_sh; // section header of section header string table
+    elf_sect_header temp_sh; // temporary section header
+    off = ctx->ehdr.shoff + ctx->ehdr.shentsize * ctx->ehdr.shstrndx; // offset of section header string table
+    if (elf_fpread(ctx, &shstr_sh, sizeof(shstr_sh), off) != sizeof(shstr_sh)) return EL_EIO; // read section header of section header string table
+    // find .debug_line section
+    for (i = 0, off = ctx->ehdr.shoff; i < ctx->ehdr.shnum; i++, off += sizeof(temp_sh)) {
+        if (elf_fpread(ctx, &temp_sh, sizeof(temp_sh), off) != sizeof(temp_sh)) return EL_EIO; // read section header
+        char name[64]; // section name
+        if (elf_fpread(ctx, name, 64, shstr_sh.offset + temp_sh.name) != 64) return EL_EIO; // read section name
+        if (strcmp(name, ".debug_line") == 0) { // find .debug_line section
+            // sprint("find .debug_line section\n");
+            if (elf_fpread(ctx, debugline, temp_sh.size, temp_sh.offset) != temp_sh.size) return EL_EIO; // read .debug_line section
+            // sprint("read .debug_line section %s\n", debugline);
+            make_addr_line(ctx, debugline, temp_sh.size); // analyze .debug_line section
+            // sprint("analyze .debug_line section, make_addr_line = %s\n", make_addr_line);
+            break;
+        }
+    }
   return EL_OK;
 }
 

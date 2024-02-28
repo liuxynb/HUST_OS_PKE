@@ -64,6 +64,22 @@ typedef struct __attribute__((packed)) {
     uint8 std_opcode_lengths[12];
 } debug_header;
 
+// elf section header structure
+// ! reference: https://man7.org/linux/man-pages/man5/elf.5.html
+typedef struct elf_section_header_t
+{
+  uint32 sh_name;      /* Section name */
+  uint32 sh_type;      /* Section type */
+  uint64 sh_flags;     /* Section flags */
+  uint64 sh_addr;      /* Section virtual address at execution */
+  uint64 sh_offset;    /* Section offset of file */
+  uint64 sh_size;      /* Section's size in bytes */
+  uint32 sh_link;      /* Section header table link which links to another section */
+  uint32 sh_info;      /* Extra information */
+  uint64 sh_addralign; /* Section address alignment constrainents */
+  uint64 sh_entsize;   /* Entry size in bytes if section holds table */
+} elf_section_header;
+
 #define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
 #define ELF_PROG_LOAD 1
 
