@@ -97,6 +97,7 @@ int s_start(void) {
   // the application code (elf) is first loaded into memory, and then put into execution
   load_user_program(&user_app);
 
+
   sprint("Switch to user mode...\n");
   // switch_to() is defined in kernel/process.c
   switch_to(&user_app);

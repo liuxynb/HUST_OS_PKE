@@ -64,3 +64,18 @@ void switch_to(process* proc) {
   // note, return_to_user takes two parameters @ and after lab2_1.
   return_to_user(proc->trapframe, user_satp);
 }
+
+// added @lab2_c2
+// Grow or shrink user memory by n bytes.
+// Return 0 on success, -1 on failure.
+int
+growproc(int n)
+{
+  if(n < 0)
+    panic("ERROR: growproc: negative n\n");
+  uint64 sz;
+  sz = current->heap_break;
+  uvmalloc(current->pagetable, sz, sz + n);
+  current->heap_break += n;
+  return 0;
+}

@@ -10,6 +10,8 @@
 #include "util/string.h"
 #include "spike_interface/spike_utils.h"
 #include "util/functions.h"
+// added on lab2_c2
+#include "process.h"
 
 /* --- utility functions for virtual address mapping --- */
 //
@@ -223,4 +225,77 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free)
     }
   }
   // panic("You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n");
+}
+
+// added on lab2_c2
+
+// Allocate PTEs and physical memory to grow process from oldsz to
+// newsz, which need not be page aligned.  Returns new size or panic on error.
+uint64 uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
+{
+  char *mem;
+  uint64 a;
+  if(newsz < oldsz)
+    return oldsz;
+  oldsz = PGROUNDUP(oldsz);
+  for(a = oldsz; a < newsz; a += PGSIZE){
+    mem = alloc_page();
+    if(mem == NULL){
+      panic("uvmalloc: out of memory\n");
+    }
+    memset(mem, 0, PGSIZE);
+    if(map_pages(pagetable, oldsz, PGSIZE, (uint64)mem, prot_to_type(PROT_READ | PROT_WRITE, 1)) != 0){
+      panic("map error\n");
+    }
+  }
+  return newsz;
+}
+
+
+void heap_init()
+{
+  current->heap_break = USER_FREE_ADDRESS_START;
+  current->heap_num = 0;
+}
+
+uint64 better_malloc(int n)
+{
+  // first try to find a block that is available and big enough
+  
+  for(int i=0; i<current->heap_num; i++)
+  {
+    if(current->heap[i]->available && current->heap[i]->size >= n)
+    {
+      current->heap[i]->available = 0;
+      return current->heap[i]->addr;
+    }
+  }
+  // if no such block is found, allocate a new page
+  uint64 addr = current->heap_break;
+  growproc(n+sizeof(memory_cblk)+8);
+  pte_t *pte = page_walk(current->pagetable, addr, 0);
+  memory_cblk *cblk = (memory_cblk *)(PTE2PA(*pte) + (addr & 0xFFF)); 
+  uint64 amo = (8 - ((uint64)cblk % 8)) % 8; // align to 8 bytes
+  cblk = (memory_cblk *)((uint64)cblk + amo);
+  cblk->size = n;
+  cblk->addr = addr+sizeof(memory_cblk);
+  cblk->available = 0;
+  current->heap[current->heap_num] = cblk;
+  current->heap_num++;
+  // sprint("malloc addr: 0x%lx\n", addr+ sizeof(memory_cblk));
+  return addr+ sizeof(memory_cblk);
+}
+
+void better_free(void *va)
+{
+  for(int i=0; i<current->heap_num; i++)
+  {
+    if(current->heap[i]->addr == (uint64)va)
+    {
+      // sprint("free addr: 0x%lx\n", current->heap[i]->addr);
+      current->heap[i]->available = 1;
+      return;
+    }
+  }
+  panic("free error\n"); 
 }

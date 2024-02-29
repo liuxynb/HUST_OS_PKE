@@ -2,7 +2,7 @@
 #define _PROC_H_
 
 #include "riscv.h"
-
+#include "vmm.h"
 typedef struct trapframe_t {
   // space to store context (all common registers)
   /* offset:0   */ riscv_regs regs;
@@ -26,6 +26,11 @@ typedef struct process_t {
   pagetable_t pagetable;
   // trapframe storing the context of a (User mode) process.
   trapframe* trapframe;
+  // added @lab2_c2
+  // 增加heap管理
+  uint64 heap_break; // the start address of the heap
+  memory_cblk *heap[MAX_HEAP_SIZE]; // the heap
+  uint64 heap_num; // the number of memory_cblk in the heap
 }process;
 
 // switch to run user app
@@ -36,5 +41,8 @@ extern process* current;
 
 // address of the first free page in our simple heap. added @lab2_2
 extern uint64 g_ufree_page;
+
+// added @lab2_c2
+int growproc(int n);
 
 #endif

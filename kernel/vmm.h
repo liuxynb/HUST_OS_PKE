@@ -32,4 +32,19 @@ void *user_va_to_pa(pagetable_t page_dir, void *va);
 void user_vm_map(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm);
 void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
 
+// added on lab2_c2
+uint64 uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz);
+void heap_init();
+uint64 better_malloc(int n);
+void better_free(void *va);
+// added on lab2_c2
+typedef struct memory_cblk
+{
+  bool available;
+  uint64 size;
+  uint64 addr;
+} memory_cblk;
+
+
+
 #endif

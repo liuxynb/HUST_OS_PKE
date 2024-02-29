@@ -62,6 +62,24 @@ uint64 sys_user_free_page(uint64 va)
   return 0;
 }
 
+// added @lab2_c2
+int flag = 1;
+uint64 sys_user_malloc(int n)
+{
+  if(flag)
+  {
+    flag = 0;
+    heap_init();
+    // sprint("heap_init ok\n");
+  }
+  return (uint64)better_malloc(n);
+}
+uint64 sys_user_free(void *va)
+{
+  better_free((void *)va);
+  return 0;
+}
+
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
@@ -79,6 +97,11 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
     return sys_user_allocate_page();
   case SYS_user_free_page:
     return sys_user_free_page(a1);
+  // added @lab2_c2
+  case SYS_user_malloc:
+    return sys_user_malloc(a1);
+  case SYS_user_free:
+    return sys_user_free((void *)a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }

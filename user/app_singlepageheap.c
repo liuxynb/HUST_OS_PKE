@@ -24,7 +24,7 @@ int main(void) {
     exit(-1);
   }
   better_free((void *)m);
-
+  
   strcpy(p,str);
   printu("%s\n",p);
   char *n = (char *)better_malloc(50);
