@@ -91,6 +91,17 @@ typedef struct process_t {
   int tick_count;
 }process;
 
+// added @lab3_c2
+typedef struct semaphore_t 
+{
+  int count; // the number of resources
+  int occupied; // 0: free, 1: occupied
+  process* queue_head;
+  process* queue_tail;
+} semaphore;
+
+
+
 // switch to run user app
 void switch_to(process*);
 
@@ -105,5 +116,10 @@ int do_fork(process* parent);
 
 // current running process
 extern process* current;
+
+// added @lab3_c2
+int sem_create(int count);
+int sem_P(int s);
+int sem_V(int s);
 
 #endif

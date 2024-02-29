@@ -95,6 +95,34 @@ ssize_t sys_user_yield() {
 }
 
 //
+// kerenl entry point of sem_new. added @lab3_c2
+//
+ssize_t sys_sem_new(int count) {
+  if(sem_create(count) == -1)
+    panic("sem_new failed\n");
+  return 0;
+}
+
+//
+// kerenl entry point of sem_P. added @lab3_c2
+//
+ssize_t sys_sem_P(int sem) {
+  if(sem_P(sem) == -1)
+    panic("sem_P failed\n");
+  return 0;
+}
+
+//
+// kerenl entry point of sem_V. added @lab3_c2
+//
+ssize_t sys_sem_V(int sem) {
+  if(sem_V(sem) == -1)
+    panic("sem_V failed\n");
+  return 0;
+}
+
+
+//
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
@@ -113,6 +141,13 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_fork();
     case SYS_user_yield:
       return sys_user_yield();
+    // added @lab3_c2
+    case SYS_user_sem_new:
+      return sys_sem_new(a1);
+    case SYS_user_sem_P:
+      return sys_sem_P(a1);
+    case SYS_user_sem_V:
+      return sys_sem_V(a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }
