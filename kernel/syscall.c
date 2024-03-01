@@ -106,6 +106,7 @@ ssize_t sys_user_yield()
 }
 ssize_t sys_user_printpa(uint64 va)
 {
+  // sprint("User call printpa, va = %lx.\n", va);
   uint64 pa = (uint64)user_va_to_pa((pagetable_t)(current->pagetable), (void*)va);
   sprint("%lx\n", pa);
   return 0;

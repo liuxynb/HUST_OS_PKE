@@ -242,3 +242,23 @@ void print_proc_vmspace(process* proc) {
     sprint( ", mapped to pa:%lx\n", lookup_pa(proc->pagetable, proc->mapped_info[i].va) );
   }
 }
+
+//
+// added @lab3_c3, check if the page is copy-on-write
+// 
+int cowcheck(pagetable_t pagetable, uint64 va)
+{
+  if(va >= MAXVA)
+    return 0;
+  pte_t *pte;
+  if((pte = page_walk(pagetable, va, 0)) == 0)
+    return 0;
+  if((*pte & PTE_V) == 0)
+    return 0;
+  if((*pte & PTE_C))
+  {
+    //读时不会触发trap，只检测PTE_C就行
+    return 1;
+  }
+  return 0;
+}
