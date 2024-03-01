@@ -292,6 +292,34 @@ int do_fork(process *parent)
 
 
 // added @lab4_c2
+
+
+// Load a program segment into pagetable at virtual address va.
+// va must be page-aligned
+// and the pages from va to va+sz must already be mapped.
+// Returns 0 on success, -1 on failure.
+static int
+loadseg(pagetable_t pagetable, uint64 va, int fp,  uint64 sz)
+{
+  uint64 i, n;
+  uint64 pa;
+
+  for(i = 0; i < sz; i += PGSIZE){
+    pa = walkaddr(pagetable, va + i);
+    if(pa == 0)
+      panic("loadseg: address should exist");
+    if(sz - i < PGSIZE)
+      n = sz - i;
+    else
+      n = PGSIZE;
+    if(read(fp, (uint64)pa,  n) != n)
+      return -1;
+  }
+  
+  return 0;
+}
+
+
 // reclaim the open-file management data structure of a process.
 // exec会根据读入的可执行文件将'原进程'的数据段、代码段和堆栈段替换。
 int do_execv(char *path)
@@ -350,30 +378,18 @@ int do_execv(char *path)
       sprint("Program segments in file %s are not page-aligned.\n", path);
       return -1;
     }
-    if (ph.filesz > 0)
+    if(ph.vaddr + ph.memsz < ph.vaddr)
     {
-      if (readn(fd, (char *)ph.vaddr, ph.off, ph.filesz) != ph.filesz)
-      {
-        close(fd);
-        sprint("Cannot read program segment from file %s.\n", path);
-        return -1;
-      }
+      close(fd);
+      sprint("Invalid program header in file %s.\n", path);
+      return -1;
     }
-    if (ph.memsz > ph.filesz)
-    {
-      memset((char *)(ph.vaddr + ph.filesz), 0, ph.memsz - ph.filesz);
-    }
+    uint64 szl;
+    if((szl = ))
   }
 
   
-  // Check if the current process has a valid pagetable
-  pagetable_t pagetable = current->pagetable;
-  if (!pagetable)
-  {
-    close(fd);
-    sprint("Invalid pagetable in current process.\n");
-    return -1;
-  }
+
 
   
 
