@@ -289,3 +289,115 @@ int do_fork(process *parent)
 
   return child->pid;
 }
+
+
+// added @lab4_c2
+// reclaim the open-file management data structure of a process.
+// exec会根据读入的可执行文件将'原进程'的数据段、代码段和堆栈段替换。
+int do_execv(char *path)
+{
+  // Load the program into memory
+  int fd = do_open(path, O_RDONLY);
+  if (fd < 0)
+  {
+    sprint("Cannot open file %s.\n", path); 
+    return -1;
+  }
+  elf_header elf;
+  
+  if (read(fd, (char *)&elf, sizeof(elf)) != sizeof(elf))
+  {
+    close(fd);
+    sprint("Cannot read ELF header from file %s.\n", path); 
+    return -1;
+  }
+
+  // Check ELF header
+  if (elf.magic != ELF_MAGIC)
+  {
+    close(fd);
+    sprint("Invalid ELF format in file %s.\n", path);
+    return -1;
+  }
+
+  // Check if the current process has a valid pagetable
+  pagetable_t pagetable = current->pagetable;
+  if (!pagetable)
+  {
+    close(fd);
+    sprint("Invalid pagetable in current process.\n");
+    return -1;
+  }
+
+  
+
+  for (int i = 0; i < current->total_mapped_region; i++)
+  {
+    // load its code segment.
+    switch (current->mapped_info[i].seg_type)
+    {
+    case CONTEXT_SEGMENT:
+    {
+      current->trapframe = 
+      break;
+    }
+    case STACK_SEGMENT:
+    {
+      memcpy((void *)lookup_pa(child->pagetable, child->mapped_info[STACK_SEGMENT].va),
+             (void *)lookup_pa(parent->pagetable, parent->mapped_info[i].va), PGSIZE);
+      break;
+    }
+    case HEAP_SEGMENT:
+    {
+      // build a same heap for child process.
+
+      // convert free_pages_address into a filter to skip reclaimed blocks in the heap
+      // when mapping the heap blocks
+      int free_block_filter[MAX_HEAP_PAGES];
+      memset(free_block_filter, 0, MAX_HEAP_PAGES);
+      uint64 heap_bottom = current->user_heap.heap_bottom;
+      for (int i = 0; i < current->user_heap.free_pages_count; i++)
+      {
+        int index = (current->user_heap.free_pages_address[i] - heap_bottom) / PGSIZE;
+        free_block_filter[index] = 1;
+      }
+
+      // copy and map the heap blocks
+      for (uint64 heap_block = current->user_heap.heap_bottom;
+           heap_block < current->user_heap.heap_top; heap_block += PGSIZE)
+      {
+        if (free_block_filter[(heap_block - heap_bottom) / PGSIZE]) // skip free blocks
+          continue;
+
+        void *child_pa = alloc_page();
+        memcpy(child_pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
+        user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, (uint64)child_pa,
+                    prot_to_type(PROT_WRITE | PROT_READ, 1));
+      }
+
+      child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
+
+      // copy the heap manager from parent to child
+      memcpy((void *)&child->user_heap, (void *)&parent->user_heap, sizeof(parent->user_heap));
+      break;
+    }
+    case CODE_SEGMENT:
+    {
+      for (int j = 0; j < current->mapped_info[i].npages; j++)
+      {
+        uint64 addr = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
+
+        map_pages(child->pagetable, parent->mapped_info[i].va + j * PGSIZE, PGSIZE,
+                  addr, prot_to_type(PROT_WRITE | PROT_READ | PROT_EXEC, 1));
+
+        sprint("do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
+               addr, parent->mapped_info[i].va + j * PGSIZE);
+      }
+    }
+    }
+  }
+  close(fd);
+
+
+  return 0;
+}
