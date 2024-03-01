@@ -296,6 +296,10 @@ int do_fork(process *parent)
 // exec会根据读入的可执行文件将'原进程'的数据段、代码段和堆栈段替换。
 int do_execv(char *path)
 {
+  process *proc = current;
+  elf_header elf;
+  elf_prog_header ph;
+
   // Load the program into memory
   int fd = do_open(path, O_RDONLY);
   if (fd < 0)
@@ -303,15 +307,13 @@ int do_execv(char *path)
     sprint("Cannot open file %s.\n", path); 
     return -1;
   }
-  elf_header elf;
-  
+ 
   if (read(fd, (char *)&elf, sizeof(elf)) != sizeof(elf))
   {
     close(fd);
     sprint("Cannot read ELF header from file %s.\n", path); 
     return -1;
   }
-
   // Check ELF header
   if (elf.magic != ELF_MAGIC)
   {
@@ -319,7 +321,51 @@ int do_execv(char *path)
     sprint("Invalid ELF format in file %s.\n", path);
     return -1;
   }
+  // Load the program segments into memory:
+  for(int i=0; i < elf.phnum; i++)
+  {
+    if (read(fd, (char *)&ph, sizeof(ph)) != sizeof(ph))
+    {
+      close(fd);
+      sprint("Cannot read program header from file %s.\n", path);
+      return -1;
+    }
+    if (ph.type != ELF_PROG_LOAD)
+      continue;
+    if (ph.memsz < ph.filesz)
+    {
+      close(fd);
+      sprint("Invalid program header in file %s.\n", path);
+      return -1;
+    }
+    if (ph.vaddr + ph.memsz > MAXVA)
+    {
+      close(fd);
+      sprint("Program segments in file %s are too large.\n", path);
+      return -1;
+    }
+    if (ph.vaddr % PGSIZE != 0)
+    {
+      close(fd);
+      sprint("Program segments in file %s are not page-aligned.\n", path);
+      return -1;
+    }
+    if (ph.filesz > 0)
+    {
+      if (readn(fd, (char *)ph.vaddr, ph.off, ph.filesz) != ph.filesz)
+      {
+        close(fd);
+        sprint("Cannot read program segment from file %s.\n", path);
+        return -1;
+      }
+    }
+    if (ph.memsz > ph.filesz)
+    {
+      memset((char *)(ph.vaddr + ph.filesz), 0, ph.memsz - ph.filesz);
+    }
+  }
 
+  
   // Check if the current process has a valid pagetable
   pagetable_t pagetable = current->pagetable;
   if (!pagetable)
