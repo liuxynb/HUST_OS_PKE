@@ -278,28 +278,28 @@ int sem_P(int s)
   {
     return -1;
   }
-  if (sem[s].count <= 0)
+  // sprint("sem_P s = %d, : count = %d\n", s, sem[s].count);
+  sem[s].count--;
+  if (sem[s].count < 0)
   {
-    // block the process
-    current->status = BLOCKED;
     current->queue_next = NULL;
+    current->status = BLOCKED; 
     if (sem[s].queue_head == NULL)
     {
-      sem[s].queue_head = current;
+      sem[s].queue_head = sem[s].queue_tail = current;
+      current->queue_next = NULL;
     }
     else
     {
       sem[s].queue_tail->queue_next = current;
+      sem[s].queue_tail = sem[s].queue_tail->queue_next; //这样的话，queue_tail就是current了。
     }
-    sem[s].queue_tail = current;
     schedule();
   }
-  else
-  {
-    sem[s].count--;
-  }
+    
   return 0;
 }
+
 
 int sem_V(int s)
 {
@@ -307,17 +307,15 @@ int sem_V(int s)
   {
     return -1;
   }
+  sem[s].count++;
+  // sprint("sem_V %d: count = %d\n", s, sem[s].count);
   if (sem[s].queue_head != NULL)
   {
     process *p = sem[s].queue_head;
-    sem[s].queue_head = p->queue_next;
+    sem[s].queue_head = sem[s].queue_head->queue_next;
     p->queue_next = NULL;
     p->status = READY;
     insert_to_ready_queue(p);
-  }
-  else
-  {
-    sem[s].count++;
   }
   return 0;
 }

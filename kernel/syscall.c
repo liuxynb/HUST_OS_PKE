@@ -109,15 +109,15 @@ ssize_t sys_user_yield()
 // kerenl entry point of sem_new. added @lab3_c2
 //
 ssize_t sys_sem_new(int count) {
-  if(sem_create(count) == -1)
-    panic("sem_new failed\n");
-  return 0;
+  return sem_create(count);
+    
 }
 
 //
 // kerenl entry point of sem_P. added @lab3_c2
 //
 ssize_t sys_sem_P(int sem) {
+  // sprint("sem_P: %d\n", sem);
   if(sem_P(sem) == -1)
     panic("sem_P failed\n");
   return 0;
