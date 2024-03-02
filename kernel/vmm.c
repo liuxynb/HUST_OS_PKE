@@ -250,24 +250,34 @@ void print_proc_vmspace(process* proc) {
 
 // added on lab3_c3
 //
-void heap_copy_on_write(process *child, process *parent) {
+void heap_copy_on_write(process *child, process *parent, uint64 pa) {
   // 需要复制父进程的堆空间
   for (uint64 heap_block = parent->user_heap.heap_bottom;
       heap_block < parent->user_heap.heap_top; heap_block += PGSIZE) 
   {
-    user_vm_unmap(child->pagetable, heap_block, PGSIZE, 0); // 取消映射
-    void *pa = alloc_page();
-    if ((void *)pa == NULL)
-      panic("Can not allocate a new physical page.\n");
-    pte_t *child_pte = page_walk(child->pagetable, heap_block, 0);
-    if(child_pte == NULL) {
-      panic("error when mapping heap segment!");
+    uint64 heap_block_pa = lookup_pa(parent->pagetable, heap_block);
+    if(heap_block_pa == 0) {
+      panic("error when looking up heap block pa!");
     }
-    *child_pte |= (~PTE_C); // 设置写时复制标志，为已复制
-    *child_pte &= PTE_W | PTE_R;    // 设置读写权限
-    user_vm_map(child->pagetable, heap_block, PGSIZE, (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
-    // sprint("do_fork map heap segment at pa:%lx of parent to child at va:%lx.\n", pa, heap_block);
-    memcpy(pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
+    if(heap_block_pa >= pa && heap_block_pa < pa + PGSIZE) {
+      user_vm_unmap(child->pagetable, heap_block, PGSIZE, 0); // 取消映射
+      void *pa = alloc_page();
+      if ((void *)pa == NULL)
+        panic("Can not allocate a new physical page.\n");
+      pte_t *child_pte = page_walk(child->pagetable, heap_block, 0);
+      if(child_pte == NULL) {
+        panic("error when mapping heap segment!");
+      }
+      *child_pte |= (~PTE_C); // 设置写时复制标志，为已复制
+      *child_pte &= PTE_W | PTE_R;    // 设置读写权限
+      user_vm_map(child->pagetable, heap_block, PGSIZE, (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
+      // sprint("do_fork map heap segment at pa:%lx of parent to child at va:%lx.\n", pa, heap_block);
+      memcpy(pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
+      sprint("heap block pa:%lx is already copied to child.\n", heap_block_pa);
+      break;
+    }
+
+    
    
   }
 }

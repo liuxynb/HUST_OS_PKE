@@ -77,7 +77,8 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
     else if(*pte & PTE_C)
     {
       // sprint("copy on write\n");
-      heap_copy_on_write(current, current->parent);
+      pa = PTE2PA(*pte);
+      heap_copy_on_write(current, current->parent, pa);
     }
     break;
   default:

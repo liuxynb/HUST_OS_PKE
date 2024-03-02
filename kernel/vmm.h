@@ -35,5 +35,5 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free);
 void print_proc_vmspace(process* proc);
 
 // added on lab3_c3
-void heap_copy_on_write(process *child, process *parent);
+void heap_copy_on_write(process *child, process *parent, uint64 pa);
 #endif
