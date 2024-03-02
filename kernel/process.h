@@ -25,6 +25,7 @@ typedef struct process_t {
 
 void switch_to(process*);
 
-extern process* current;
+// modified on lab1_c3
+extern process* current[NCPU]; // 支持多核，current[0]表示核0的当前进程，current[1]表示核1的当前进程，以此类推
 
 #endif
