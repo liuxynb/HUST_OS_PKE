@@ -18,6 +18,7 @@
 #include "sched.h"
 #include "spike_interface/spike_utils.h"
 
+
 // Two functions defined in kernel/usertrap.S
 extern char smode_trap_vector[];
 extern void return_to_user(trapframe *, uint64 satp);
@@ -302,17 +303,17 @@ static int
 loadseg(pagetable_t pagetable, uint64 va, int fp,  uint64 sz)
 {
   uint64 i, n;
-  uint64 pa;
+  pte_t *pa;
 
   for(i = 0; i < sz; i += PGSIZE){
-    pa = walkaddr(pagetable, va + i);
+    pa = page_walk(pagetable, va + i, 1);
     if(pa == 0)
       panic("loadseg: address should exist");
     if(sz - i < PGSIZE)
       n = sz - i;
     else
       n = PGSIZE;
-    if(read(fp, (uint64)pa,  n) != n)
+    if(do_read(fp, (void *)pa,  n) != n)
       return -1;
   }
   
@@ -336,25 +337,25 @@ int do_execv(char *path)
     return -1;
   }
  
-  if (read(fd, (char *)&elf, sizeof(elf)) != sizeof(elf))
+  if (do_read(fd, (char *)&elf, sizeof(elf)) != sizeof(elf)) // 读取elf头
   {
-    close(fd);
+    do_close(fd);
     sprint("Cannot read ELF header from file %s.\n", path); 
     return -1;
   }
   // Check ELF header
   if (elf.magic != ELF_MAGIC)
   {
-    close(fd);
+    do_close(fd);
     sprint("Invalid ELF format in file %s.\n", path);
     return -1;
   }
   // Load the program segments into memory:
   for(int i=0; i < elf.phnum; i++)
   {
-    if (read(fd, (char *)&ph, sizeof(ph)) != sizeof(ph))
+    if (do_read(fd, (char *)&ph, sizeof(ph)) != sizeof(ph)) // 读取program header, 一个program header描述一个段
     {
-      close(fd);
+      do_close(fd);
       sprint("Cannot read program header from file %s.\n", path);
       return -1;
     }
@@ -362,36 +363,46 @@ int do_execv(char *path)
       continue;
     if (ph.memsz < ph.filesz)
     {
-      close(fd);
+      do_close(fd);
       sprint("Invalid program header in file %s.\n", path);
       return -1;
     }
     if (ph.vaddr + ph.memsz > MAXVA)
     {
-      close(fd);
+      do_close(fd);
       sprint("Program segments in file %s are too large.\n", path);
       return -1;
     }
     if (ph.vaddr % PGSIZE != 0)
     {
-      close(fd);
+      do_close(fd);
       sprint("Program segments in file %s are not page-aligned.\n", path);
       return -1;
     }
     if(ph.vaddr + ph.memsz < ph.vaddr)
     {
-      close(fd);
+      do_close(fd);
       sprint("Invalid program header in file %s.\n", path);
       return -1;
     }
     uint64 szl;
-    if((szl = ))
+    if((szl = uvmalloc(proc->pagetable, ph.vaddr, ph.vaddr + ph.memsz)) == 0) // 为程序段分配内存
+    {
+      do_close(fd);
+      sprint("Cannot allocate memory for program segments in file %s.\n", path);
+      return -1;
+    }
+    if(loadseg(proc->pagetable, ph.vaddr, fd, ph.filesz) < 0) // 将程序段加载到内存
+    {
+      do_close(fd);
+      sprint("Cannot load program segments in file %s.\n", path);
+      return -1;
+    }
   }
+  do_close(fd);
 
-  
 
 
-  
 
   for (int i = 0; i < current->total_mapped_region; i++)
   {

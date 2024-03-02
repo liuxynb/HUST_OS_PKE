@@ -109,5 +109,5 @@ int do_fork(process* parent);
 
 // current running process
 extern process* current;
-
+int do_execv(char *path);
 #endif
