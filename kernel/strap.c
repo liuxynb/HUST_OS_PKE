@@ -64,10 +64,21 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
     // hint: first allocate a new physical page, and then, maps the new page to the
     // virtual address that causes the page fault.
     // panic("You need to implement the operations that actually handle the page fault in lab2_3.\n");
-    pa = (uint64)alloc_page(); // allocate a new physical page
-    if ((void *)pa == NULL)
-      panic("Can not allocate a new physical page.\n");
-    map_pages(current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, pa, prot_to_type(PROT_READ | PROT_WRITE, 1)); // maps the new page to the virtual address that causes the page fault
+
+    // added on lab3_c3
+    pte_t *pte = page_walk(current->pagetable, stval, 0);
+    if(pte == NULL)  // 缺页异常
+    {
+      pa = (uint64)alloc_page(); // allocate a new physical page
+      if ((void *)pa == NULL)
+        panic("Can not allocate a new physical page.\n");
+      map_pages(current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, pa, prot_to_type(PROT_READ | PROT_WRITE, 1)); // maps the new page to the virtual address that causes the page fault
+    }
+    else if(*pte & PTE_C)
+    {
+      // sprint("copy on write\n");
+      heap_copy_on_write(current, current->parent);
+    }
     break;
   default:
     sprint("unknown page fault.\n");

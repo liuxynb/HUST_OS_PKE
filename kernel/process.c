@@ -223,13 +223,37 @@ int do_fork(process *parent)
       child->mapped_info[child->total_mapped_region].seg_type = DATA_SEGMENT;
       child->total_mapped_region++;
       break;
+    // added on lab3_c3
+    case HEAP_SEGMENT:
+      // 需要复制父进程的堆空间
+      for (uint64 heap_block = current->user_heap.heap_bottom;
+          heap_block < current->user_heap.heap_top; heap_block += PGSIZE) 
+      {
+        uint64 parent_pa = lookup_pa(parent->pagetable, heap_block);
+        // 使用写时复制模式映射堆空间
+        user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, parent_pa,
+                    prot_to_type(PROT_READ, 1));
+        // 设置pte
+        pte_t *child_pte = page_walk(child->pagetable, heap_block, 0);
+        if(child_pte == NULL) {
+          panic("error when mapping heap segment!");
+        }
+        *child_pte |= PTE_C; // 设置写时复制标志
+        pte_t *parent_pte = page_walk(parent->pagetable, heap_block, 0);
+        if(parent_pte == NULL) {
+          panic("error when mapping heap segment!");
+        }
+        *parent_pte &= (~PTE_W); // 设置父进程的pte为只读
+
+      }
+      child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
+      memcpy((void*)&child->user_heap, (void*)&parent->user_heap, sizeof(parent->user_heap));
+      break;
     }
   }
-
   child->status = READY;
   child->trapframe->regs.a0 = 0;
   child->parent = parent;
   insert_to_ready_queue(child);
-
   return child->pid;
 }

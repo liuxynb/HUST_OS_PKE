@@ -186,6 +186,8 @@ void *user_va_to_pa(pagetable_t page_dir, void *va)
     return NULL;
   pa += ((uint64)va) & ((1 << PGSHIFT) - 1); // 计算偏移量
   return (void *)pa;
+
+  
   // panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
 }
 
@@ -222,6 +224,8 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free)
       *pte = *pte & (~PTE_V);
     }
   }
+
+
   // panic("You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n");
 }
 
@@ -243,22 +247,27 @@ void print_proc_vmspace(process* proc) {
   }
 }
 
+
+// added on lab3_c3
 //
-// added @lab3_c3, check if the page is copy-on-write
-// 
-int cowcheck(pagetable_t pagetable, uint64 va)
-{
-  if(va >= MAXVA)
-    return 0;
-  pte_t *pte;
-  if((pte = page_walk(pagetable, va, 0)) == 0)
-    return 0;
-  if((*pte & PTE_V) == 0)
-    return 0;
-  if((*pte & PTE_C))
+void heap_copy_on_write(process *child, process *parent) {
+  // 需要复制父进程的堆空间
+  for (uint64 heap_block = parent->user_heap.heap_bottom;
+      heap_block < parent->user_heap.heap_top; heap_block += PGSIZE) 
   {
-    //读时不会触发trap，只检测PTE_C就行
-    return 1;
+    user_vm_unmap(child->pagetable, heap_block, PGSIZE, 0); // 取消映射
+    void *pa = alloc_page();
+    if ((void *)pa == NULL)
+      panic("Can not allocate a new physical page.\n");
+    pte_t *child_pte = page_walk(child->pagetable, heap_block, 0);
+    if(child_pte == NULL) {
+      panic("error when mapping heap segment!");
+    }
+    *child_pte |= (~PTE_C); // 设置写时复制标志，为已复制
+    *child_pte &= PTE_W | PTE_R;    // 设置读写权限
+    user_vm_map(child->pagetable, heap_block, PGSIZE, (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
+    // sprint("do_fork map heap segment at pa:%lx of parent to child at va:%lx.\n", pa, heap_block);
+    memcpy(pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
+   
   }
-  return 0;
 }
