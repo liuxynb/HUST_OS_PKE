@@ -13,7 +13,7 @@
 
 /* we use fixed physical (also logical) addresses for the stacks and trap frames as in
  Bare memory-mapping mode */
-// user stack top
+// user stack top, the stack grows down
 #define USER_STACK(i) (0x81100000 + i * STACK_SIZE)
 
 // the stack used by PKE kernel when a syscall happens
