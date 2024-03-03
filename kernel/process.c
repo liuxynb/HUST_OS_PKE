@@ -306,8 +306,7 @@ int do_execv(char *path)
   }
   //将现在进程p的内存空间释放
   process *p = current;
-  int tot = p->total_mapped_region;
-  for(int i=0;i<tot;i++){
+  for(int i = 0; i < p->total_mapped_region; i++){
     switch(p->mapped_info[i].seg_type){
       case CODE_SEGMENT:
         sprint("free code segment\n");
@@ -321,9 +320,10 @@ int do_execv(char *path)
         break;
       case HEAP_SEGMENT:
         sprint("free heap segment\n");
-        user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[HEAP_SEGMENT].va, PGSIZE, 1);
-        p->total_mapped_region--;
-        break;
+        // sprint("n_pages:%d\n",p->mapped_info[HEAP_SEGMENT].npages);
+        if(p->mapped_info[HEAP_SEGMENT].npages!=0){
+          user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[HEAP_SEGMENT].va, p->mapped_info[HEAP_SEGMENT].npages*PGSIZE, 1);
+        }
       case STACK_SEGMENT:
         sprint("free stack segment\n");
         user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[STACK_SEGMENT].va, PGSIZE, 1);
@@ -335,5 +335,7 @@ int do_execv(char *path)
   }
   sprint("free process memory space successfully.\n");
   load_bincode_from_gived_elf(current, path);
+   //读取elf文件，将其代码段，数据段，堆栈段替换进程的内存空间
+  
   return 0;
 }

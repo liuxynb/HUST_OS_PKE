@@ -180,7 +180,7 @@ void load_bincode_from_gived_elf(process *p, char *app_name) {
   // elf_info is defined above, used to tie the elf file and its corresponding process.
   elf_info info;
 
-  info.f = spike_file_open(app_name, O_RDONLY, 0);
+  info.f = spike_file_open(app_name, O_RDONLY, 1);
   info.p = p;
   // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
   if (IS_ERR_VALUE(info.f)) panic("Fail on openning the input application program.\n");
@@ -188,13 +188,12 @@ void load_bincode_from_gived_elf(process *p, char *app_name) {
   // init elfloader context. elf_init() is defined above.
   if (elf_init(&elfloader, &info) != EL_OK)
     panic("fail to init elfloader.\n");
-
+  
   // load elf. elf_load() is defined above.
   if (elf_load(&elfloader) != EL_OK) panic("Fail on loading elf.\n");
-
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;
-
+  
   // close the host spike file
   spike_file_close( info.f );
 
