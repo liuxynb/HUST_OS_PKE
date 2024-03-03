@@ -14,7 +14,7 @@
 #include "vmm.h"
 #include "sched.h"
 #include "proc_file.h"
-
+#include "hostfs.h"
 #include "spike_interface/spike_utils.h"
 
 //
@@ -249,7 +249,13 @@ ssize_t sys_user_unlink(char *vfn)
 ssize_t do_exec(char *path)
 {
   char *ppath = (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)path);
-  return do_execv(ppath);
+  char * ppath_1 = (char*)alloc_page();
+  strcpy(ppath_1, H_ROOT_DIR);
+  strcpy(ppath_1+strlen(H_ROOT_DIR), ppath);
+  sprint("Application: %s\n", ppath_1);
+  do_execv(ppath_1);
+  return 0;
+  
 }
 
 

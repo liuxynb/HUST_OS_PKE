@@ -293,38 +293,47 @@ int do_fork(process *parent)
 
 
 // added @lab4_c2
-
-
-// Load a program segment into pagetable at virtual address va.
-// va must be page-aligned
-// and the pages from va to va+sz must already be mapped.
-// Returns 0 on success, -1 on failure.
-static int
-loadseg(pagetable_t pagetable, uint64 va, int fp,  uint64 sz)
-{
-  uint64 i, n;
-  pte_t *pa;
-
-  for(i = 0; i < sz; i += PGSIZE){
-    pa = page_walk(pagetable, va + i, 1);
-    if(pa == 0)
-      panic("loadseg: address should exist");
-    if(sz - i < PGSIZE)
-      n = sz - i;
-    else
-      n = PGSIZE;
-    if(do_read(fp, (void *)pa,  n) != n)
-      return -1;
-  }
-  
-  return 0;
-}
-
-
 // reclaim the open-file management data structure of a process.
 // exec会根据读入的可执行文件将'原进程'的数据段、代码段和堆栈段替换。
 int do_execv(char *path)
 {
-  struct file *elf_file = vfs_open(path, O_RDONLY);
+  spike_file_t * file = spike_file_open(path,O_RDONLY, 0);
+  if(IS_ERR_VALUE(file)){
+    panic("Fail on openning the input application program.\n");
+    return -1;
+  }else{
+    sprint("file:%s open success\n",path);
+  }
+  //将现在进程p的内存空间释放
+  process *p = current;
+  int tot = p->total_mapped_region;
+  for(int i=0;i<tot;i++){
+    switch(p->mapped_info[i].seg_type){
+      case CODE_SEGMENT:
+        sprint("free code segment\n");
+        user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[CODE_SEGMENT].va, PGSIZE, 1);
+        p->total_mapped_region--;
+        break;
+      case DATA_SEGMENT:
+        sprint("free data segment\n");
+        user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[DATA_SEGMENT].va, PGSIZE, 1);
+        p->total_mapped_region--;
+        break;
+      case HEAP_SEGMENT:
+        sprint("free heap segment\n");
+        user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[HEAP_SEGMENT].va, PGSIZE, 1);
+        p->total_mapped_region--;
+        break;
+      case STACK_SEGMENT:
+        sprint("free stack segment\n");
+        user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[STACK_SEGMENT].va, PGSIZE, 1);
+        p->total_mapped_region--;
+        break;
+      default:
+        break;
+    }
+  }
+  sprint("free process memory space successfully.\n");
+  load_bincode_from_gived_elf(current, path);
   return 0;
 }
