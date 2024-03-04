@@ -10,10 +10,6 @@
 #include "pmm.h"
 #include "spike_interface/spike_utils.h"
 
-typedef struct elf_info_t {
-  spike_file_t *f;
-  process *p;
-} elf_info;
 
 //
 // the implementation of allocater. allocates memory space for later segment loading.
@@ -198,4 +194,77 @@ void load_bincode_from_gived_elf(process *p, char *app_name) {
   spike_file_close( info.f );
 
   sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
+}
+
+elf_status elf_substitute(process * p,elf_ctx * ctx,elf_info * info)
+{
+  elf_prog_header ph_addr;
+  int i, off;
+  for (i = 0, off = ctx->ehdr.phoff; i < ctx->ehdr.phnum; i++, off += sizeof(ph_addr)) 
+  {
+    if(elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr)) return EL_EIO;
+    if(ph_addr.type != ELF_PROG_LOAD) continue;
+    if(ph_addr.memsz < ph_addr.filesz) return EL_ERR;
+    if(ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr) return EL_ERR;
+    if(ph_addr.flags == (SEGMENT_READABLE|SEGMENT_EXECUTABLE))
+    {
+      //代码段
+      for(int j=0;j<PGSIZE/sizeof(mapped_region);j++){
+        if(p->mapped_info[j].seg_type == CODE_SEGMENT){
+          sprint( "CODE_SEGMENT added at mapped info offset:%d\n", j );
+          // 释放原来的代码段
+          user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[j].va, PGSIZE, 1);
+          // 重新映射新的代码段
+          void *dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
+          if(elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
+            return EL_EIO;
+          p->mapped_info[j].va = ph_addr.vaddr;
+          p->mapped_info[j].npages = 1;
+          p->mapped_info[j].seg_type = CODE_SEGMENT;
+          break;
+        }
+      }
+    }
+    else if ( ph_addr.flags == (SEGMENT_READABLE|SEGMENT_WRITABLE) )
+    {
+      int found = 0;//标记是否找到了数据段
+      for(int j=0;j<PGSIZE/sizeof(mapped_region);j++){
+        if(p->mapped_info[j].seg_type == DATA_SEGMENT){
+          sprint( "DATA_SEGMENT added at mapped info offset:%d\n", j );
+          // 释放原来的数据段
+          user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[j].va, PGSIZE, 1);
+          // 重新映射新的数据段
+          void *dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
+          if(elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
+            return EL_EIO;
+          p->mapped_info[j].va = ph_addr.vaddr;
+          p->mapped_info[j].npages = 1;
+          p->mapped_info[j].seg_type = DATA_SEGMENT;
+          found = 1;
+          break;
+        }
+      }
+      if(found==0)
+      {// 不存在数据段
+        void * dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
+        if(elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
+          return EL_EIO;
+        for(int j = 0; j < PGSIZE / sizeof(mapped_region); j++) {
+          if(p->mapped_info[j].va == 0) {
+            sprint( "DATA_SEGMENT added at mapped info offset:%d\n", j );
+            p->mapped_info[j].npages = 1;
+            p->mapped_info[j].va = ph_addr.vaddr;
+            p->mapped_info[j].seg_type = DATA_SEGMENT;
+            p->total_mapped_region++;
+            break;
+          }
+        }
+      }
+    }
+    else
+    {
+      panic( "unknown program segment encountered, segment flag:%d.\n", ph_addr.flags );
+    }
+  }
+  return EL_OK;
 }

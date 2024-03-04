@@ -60,9 +60,16 @@ typedef struct elf_ctx_t {
   elf_header ehdr;
 } elf_ctx;
 
+typedef struct elf_info_t {
+  spike_file_t *f;
+  process *p;
+} elf_info;
+
+
 elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
 void load_bincode_from_host_elf(process *p);
 void load_bincode_from_gived_elf(process *p, char *app_name);
+elf_status elf_substitute(process * p,elf_ctx * ctx, elf_info * info);
 #endif

@@ -304,38 +304,15 @@ int do_execv(char *path)
   }else{
     sprint("file:%s open success\n",path);
   }
-  //将现在进程p的内存空间释放
+  elf_ctx elfloader;
+  elf_info info;
   process *p = current;
-  for(int i = 0; i < p->total_mapped_region; i++){
-    switch(p->mapped_info[i].seg_type){
-      case CODE_SEGMENT:
-        sprint("free code segment\n");
-        user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[CODE_SEGMENT].va, PGSIZE, 1);
-        p->total_mapped_region--;
-        break;
-      case DATA_SEGMENT:
-        sprint("free data segment\n");
-        user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[DATA_SEGMENT].va, PGSIZE, 1);
-        p->total_mapped_region--;
-        break;
-      case HEAP_SEGMENT:
-        sprint("free heap segment\n");
-        // sprint("n_pages:%d\n",p->mapped_info[HEAP_SEGMENT].npages);
-        if(p->mapped_info[HEAP_SEGMENT].npages!=0){
-          user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[HEAP_SEGMENT].va, p->mapped_info[HEAP_SEGMENT].npages*PGSIZE, 1);
-        }
-      case STACK_SEGMENT:
-        sprint("free stack segment\n");
-        user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[STACK_SEGMENT].va, PGSIZE, 1);
-        p->total_mapped_region--;
-        break;
-      default:
-        break;
-    }
+  if(elf_substitute(p,&elfloader,&info) != EL_OK){
+    panic("Fail on loading elf.\n");
+    return -1;
   }
-  sprint("free process memory space successfully.\n");
-  load_bincode_from_gived_elf(current, path);
-   //读取elf文件，将其代码段，数据段，堆栈段替换进程的内存空间
-  
+  p->trapframe->epc = elfloader.ehdr.entry;
+  spike_file_close(file);
+  sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
   return 0;
 }
