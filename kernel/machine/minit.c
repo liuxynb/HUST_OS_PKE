@@ -5,6 +5,7 @@
 #include "util/types.h"
 #include "kernel/riscv.h"
 #include "kernel/config.h"
+#include "kernel/sync_utils.h" // added @lab2_c3, for syncronization
 #include "spike_interface/spike_utils.h"
 
 //
@@ -90,13 +91,18 @@ void timerinit(uintptr_t hartid) {
 //
 // m_start: machine mode C entry point.
 //
+volatile int started = 0;
 void m_start(uintptr_t hartid, uintptr_t dtb) {
   // init the spike file interface (stdin,stdout,stderr)
   // functions with "spike_" prefix are all defined in codes under spike_interface/,
   // sprint is also defined in spike_interface/spike_utils.c
-  spike_file_init();
-  sprint("In m_start, hartid:%d\n", hartid);
-
+  write_tp(hartid); // set the thread pointer to the hartid
+  if(hartid == 0)
+  {
+    spike_file_init();
+    sprint("In m_start, hartid:%d\n", hartid);
+  }
+  sync_barrier(&started, NCPU);
   // init HTIF (Host-Target InterFace) and memory by using the Device Table Blob (DTB)
   // init_dtb() is defined above.
   init_dtb(dtb);
