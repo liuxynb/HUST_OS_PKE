@@ -298,7 +298,8 @@ int do_fork(process *parent)
 int do_execv(char *path)
 {
   spike_file_t * file = spike_file_open(path,O_RDONLY, 0);
-  if(IS_ERR_VALUE(file)){
+  if(IS_ERR_VALUE(file))
+  {
     panic("Fail on openning the input application program.\n");
     return -1;
   }else{
@@ -306,13 +307,20 @@ int do_execv(char *path)
   }
   elf_ctx elfloader;
   elf_info info;
-  process *p = current;
-  if(elf_substitute(p,&elfloader,&info) != EL_OK){
+  info.f = file;
+  info.p = current;
+  if(elf_init(&elfloader, &info) != EL_OK){
+    panic("fail to init elfloader.\n");
+    return -1;
+  }
+  sprint("elf_loader: phnum:%d\n", elfloader.ehdr.phnum);
+  if(elf_reload(&elfloader, &info) != EL_OK){
     panic("Fail on loading elf.\n");
     return -1;
   }
-  p->trapframe->epc = elfloader.ehdr.entry;
+  current->trapframe->epc = elfloader.ehdr.entry;
   spike_file_close(file);
-  sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
+  sprint("Application program entry point (virtual address): 0x%lx\n", current->trapframe->epc);
   return 0;
 }
+

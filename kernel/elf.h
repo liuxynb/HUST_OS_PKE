@@ -71,5 +71,5 @@ elf_status elf_load(elf_ctx *ctx);
 
 void load_bincode_from_host_elf(process *p);
 void load_bincode_from_gived_elf(process *p, char *app_name);
-elf_status elf_substitute(process * p,elf_ctx * ctx, elf_info * info);
+elf_status elf_reload(elf_ctx * ctx, elf_info * info);
 #endif
