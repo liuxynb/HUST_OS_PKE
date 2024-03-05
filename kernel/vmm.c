@@ -273,7 +273,7 @@ void heap_copy_on_write(process *child, process *parent, uint64 pa) {
       user_vm_map(child->pagetable, heap_block, PGSIZE, (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
       // sprint("do_fork map heap segment at pa:%lx of parent to child at va:%lx.\n", pa, heap_block);
       memcpy(pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
-      sprint("heap block pa:%lx is already copied to child.\n", heap_block_pa);
+      // sprint("heap block pa:%lx is already copied to child.\n", heap_block_pa);
       break;
     }
 

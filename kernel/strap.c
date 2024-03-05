@@ -56,6 +56,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
 {
   sprint("handle_page_fault: %lx\n", stval);
   uint64 pa;
+  pte_t *pte;
   switch (mcause)
   {
   case CAUSE_STORE_PAGE_FAULT:
@@ -66,7 +67,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
     // panic("You need to implement the operations that actually handle the page fault in lab2_3.\n");
 
     // added on lab3_c3
-    pte_t *pte = page_walk(current->pagetable, stval, 0);
+    pte = page_walk(current->pagetable, stval, 0);
     if(pte == NULL)  // 缺页异常
     {
       pa = (uint64)alloc_page(); // allocate a new physical page
