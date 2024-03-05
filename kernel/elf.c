@@ -29,7 +29,19 @@ static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 siz
 
   return pa;
 }
+static void *vfs_elf_alloc_mb(process *p, uint64 elf_pa, uint64 elf_va, uint64 size)
+{
+  // we assume that size of proram segment is smaller than a page.
+  kassert(size < PGSIZE);
+  void *pa = alloc_page();
+  if (pa == 0)
+    panic("uvmalloc mem alloc falied\n");
 
+  memset((void *)pa, 0, PGSIZE);
+  user_vm_map(p->pagetable, elf_va, PGSIZE, (uint64)pa,
+              prot_to_type(PROT_WRITE | PROT_READ | PROT_EXEC, 1));
+  return pa;
+}
 //
 // actual file reading, using the spike file interface.
 //
@@ -40,6 +52,11 @@ static uint64 elf_fpread(elf_ctx *ctx, void *dest, uint64 nb, uint64 offset)
   // spike_file_pread will read the elf file (msg->f) from offset to memory (indicated by
   // *dest) for nb bytes.
   return spike_file_pread(msg->f, dest, nb, offset);
+}
+static uint64 vfs_elf_pread(struct file *elf_file, void *dest, uint64 nb, uint64 offset)
+{
+  vfs_lseek(elf_file, offset, 0);
+  return vfs_read(elf_file, dest, nb);
 }
 
 //
@@ -57,6 +74,18 @@ elf_status elf_init(elf_ctx *ctx, void *info)
   if (ctx->ehdr.magic != ELF_MAGIC)
     return EL_NOTELF;
 
+  return EL_OK;
+}
+elf_status vfs_elf_init(elf_ctx *ctx, struct file *elf_file)
+{
+  if (vfs_elf_pread(elf_file, &ctx->ehdr, sizeof(ctx->ehdr), 0) != sizeof(ctx->ehdr))
+  {
+    return EL_EIO;
+  }
+  if (ctx->ehdr.magic != ELF_MAGIC)
+  {
+    return EL_NOTELF;
+  }
   return EL_OK;
 }
 
@@ -114,6 +143,62 @@ elf_status elf_load(elf_ctx *ctx)
       panic("unknown program segment encountered, segment flag:%d.\n", ph_addr.flags);
 
     ((process *)(((elf_info *)(ctx->info))->p))->total_mapped_region++;
+  }
+
+  return EL_OK;
+}
+
+elf_status vfs_elf_load(process *p, elf_ctx *ctx, struct file *elf_file)
+{
+  // elf_prog_header structure is defined in kernel/elf.h
+  elf_prog_header ph_addr;
+  int i, off;
+
+  // traverse the elf program segment headers
+  for (i = 0, off = ctx->ehdr.phoff; i < ctx->ehdr.phnum; i++, off += sizeof(ph_addr))
+  {
+    // read segment headers
+    if (vfs_elf_pread(elf_file, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr))
+      return EL_EIO;
+
+    if (ph_addr.type != ELF_PROG_LOAD)
+      continue;
+    if (ph_addr.memsz < ph_addr.filesz)
+      return EL_ERR;
+    if (ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr)
+      return EL_ERR;
+
+    // allocate memory block before elf loading
+    void *dest =vfs_elf_alloc_mb(p, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
+
+    // actual loading
+    if (vfs_elf_pread(elf_file, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
+      return EL_EIO;
+
+    // record the vm region in proc->mapped_info. added @lab3_1
+    int j;
+    for (j = 0; j < PGSIZE / sizeof(mapped_region); j++) // seek the last mapped region
+      if (p->mapped_info[j].va == 0x0)
+        break;
+
+    p->mapped_info[j].va = ph_addr.vaddr;
+    p->mapped_info[j].npages = 1;
+
+    // SEGMENT_READABLE, SEGMENT_EXECUTABLE, SEGMENT_WRITABLE are defined in kernel/elf.h
+    if (ph_addr.flags == (SEGMENT_READABLE | SEGMENT_EXECUTABLE))
+    {
+      p->mapped_info[j].seg_type = CODE_SEGMENT;
+      sprint("CODE_SEGMENT added at mapped info offset:%d\n", j);
+    }
+    else if (ph_addr.flags == (SEGMENT_READABLE | SEGMENT_WRITABLE))
+    {
+      p->mapped_info[j].seg_type = DATA_SEGMENT;
+      sprint("DATA_SEGMENT added at mapped info offset:%d\n", j);
+    }
+    else
+      panic("unknown program segment encountered, segment flag:%d.\n", ph_addr.flags);
+
+    p->total_mapped_region++;
   }
 
   return EL_OK;
@@ -189,33 +274,35 @@ void load_bincode_from_host_elf(process *p)
   sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
 }
 
-void load_bincode_from_gived_elf(process *p, char *app_name)
+void vfs_load_bincode_from_elf(process *p)
 {
-  sprint("Application: %s\n", app_name);
+  arg_buf arg_bug_msg;
+
+  // retrieve command line arguements
+  size_t argc = parse_args(&arg_bug_msg);
+  if (!argc)
+    panic("You need to specify the application program!\n");
+
+  sprint("Application: %s\n", arg_bug_msg.argv[0]);
 
   // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading process.
   elf_ctx elfloader;
-  // elf_info is defined above, used to tie the elf file and its corresponding process.
-  elf_info info;
 
-  info.f = spike_file_open(app_name, O_RDONLY, 1);
-  info.p = p;
-  // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
-  if (IS_ERR_VALUE(info.f))
-    panic("Fail on openning the input application program.\n");
+  struct file *elf_file = vfs_open(arg_bug_msg.argv[0], O_RDONLY);
 
-  // init elfloader context. elf_init() is defined above.
-  if (elf_init(&elfloader, &info) != EL_OK)
+  // init elfloader context. vfs_elf_init() is defined above.
+  if (vfs_elf_init(&elfloader, elf_file) != EL_OK)
     panic("fail to init elfloader.\n");
 
-  // load elf. elf_load() is defined above.
-  if (elf_load(&elfloader) != EL_OK)
+  // load elf. vfs_elf_load() is defined above.
+  if (vfs_elf_load(p, &elfloader, elf_file) != EL_OK)
     panic("Fail on loading elf.\n");
+
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;
 
   // close the host spike file
-  spike_file_close(info.f);
+  vfs_close(elf_file);
 
   sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
 }
@@ -235,7 +322,7 @@ elf_status elf_reload(elf_ctx *ctx, elf_info *info)
       return EL_ERR;
     if (ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr)
       return EL_ERR;
-    if (ph_addr.flags == (SEGMENT_READABLE | SEGMENT_EXECUTABLE)) 
+    if (ph_addr.flags == (SEGMENT_READABLE | SEGMENT_EXECUTABLE))
     {
       // 代码段
       for (int j = 0; j < PGSIZE / sizeof(mapped_region); j++)
@@ -256,7 +343,7 @@ elf_status elf_reload(elf_ctx *ctx, elf_info *info)
         }
       }
     }
-    else if (ph_addr.flags == (SEGMENT_READABLE | SEGMENT_WRITABLE)) 
+    else if (ph_addr.flags == (SEGMENT_READABLE | SEGMENT_WRITABLE))
     {
       // 数据段
       int found = 0; // 标记是否找到了数据段

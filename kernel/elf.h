@@ -70,6 +70,6 @@ elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
 void load_bincode_from_host_elf(process *p);
-void load_bincode_from_gived_elf(process *p, char *app_name);
+void vfs_load_bincode_from_elf(process *p);
 elf_status elf_reload(elf_ctx * ctx, elf_info * info);
 #endif
