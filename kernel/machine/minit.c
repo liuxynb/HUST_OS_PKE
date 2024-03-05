@@ -100,13 +100,13 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
   if(hartid == 0)
   {
     spike_file_init();
-    sprint("In m_start, hartid:%d\n", hartid);
+    // init HTIF (Host-Target InterFace) and memory by using the Device Table Blob (DTB)
+    // init_dtb() is defined above.
+    init_dtb(dtb);
+    
   }
   sync_barrier(&started, NCPU);
-  // init HTIF (Host-Target InterFace) and memory by using the Device Table Blob (DTB)
-  // init_dtb() is defined above.
-  init_dtb(dtb);
-
+  sprint("In m_start, hartid:%d\n", hartid);
   // save the address of trap frame for interrupt in M mode to "mscratch". added @lab1_2
   write_csr(mscratch, &g_itrframe);
 

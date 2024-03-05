@@ -35,6 +35,6 @@ void switch_to(process*);
 extern process* current[NCPU];
 
 // address of the first free page in our simple heap. added @lab2_2
-extern uint64 g_ufree_page;
+extern uint64 g_ufree_page[NCPU];
 
 #endif

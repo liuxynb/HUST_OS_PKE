@@ -55,6 +55,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
 {
   sprint("handle_page_fault: %lx\n", stval);
   uint64 pa;
+  int hartid = read_tp();
   switch (mcause)
   {
   case CAUSE_STORE_PAGE_FAULT:
@@ -66,7 +67,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
     pa = (uint64)alloc_page(); // allocate a new physical page
     if ((void *)pa == NULL)
       panic("Can not allocate a new physical page.\n");
-    map_pages(current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, pa, prot_to_type(PROT_READ | PROT_WRITE, 1)); // maps the new page to the virtual address that causes the page fault
+    map_pages(current[hartid]->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, pa, prot_to_type(PROT_READ | PROT_WRITE, 1)); // maps the new page to the virtual address that causes the page fault
     break;
   default:
     sprint("unknown page fault.\n");
@@ -84,7 +85,7 @@ void smode_trap_handler(void)
   // we will consider other previous case in lab1_3 (interrupt).
   if ((read_csr(sstatus) & SSTATUS_SPP) != 0) panic("usertrap: not from user mode");
   int hartid = read_tp();
-  assert(current);
+  assert(current[hartid]);
   // save user process counter.
   current[hartid]->trapframe->epc = read_csr(sepc);
 

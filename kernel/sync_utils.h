@@ -18,25 +18,27 @@ static inline void sync_barrier(volatile int *counter, int all) {
 }
 
 // added @lab2_c3, for isolation of page allocation and free operations using amoswap
+
+// volatile关键字用于防止编译器优化， 防止优化编译器把变量从内存装入 CPU 寄存器中
 static inline void spin_lock(volatile int *lock) {
-    int expected = 0;
-    int desired = 1;
-    asm volatile(
-        "1:\n\t"
-        "amoswap.w %0, %2, (%1)\n\t"
-        "bnez %0, 1b\n\t"
-        : "+r" (expected)
-        : "r" (lock), "r" (desired)
-        : "memory"
-    );
+  int local = 0;
+  // amoswap.{w/d}.{aqrl} rd, rs2, (rs1)
+  // rd = *rs1, *rs1 = rs2
+  // rd: local
+  // rs1: lock
+  // rs2: 1
+  do {
+    asm volatile("amoswap.w %0, %2, (%1)"
+                : "=r"(local)
+                : "r"(lock), "r"(1)
+                : "memory");
+  } while(local);
 }
 
 static inline void spin_unlock(volatile int *lock) {
-    asm volatile(
-        "sw zero, (%0)"
-        :
-        : "r" (lock)
-    );
+  asm volatile("sw zero, (%0)"
+              :
+              : "r"(lock)
+              : "memory");
 }
-
 #endif

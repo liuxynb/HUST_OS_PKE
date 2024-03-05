@@ -36,10 +36,14 @@ void enable_paging() {
 // load the elf, and construct a "process" (with only a trapframe).
 // load_bincode_from_host_elf is defined in elf.c
 //
+// volatile int lock = 0; // added @lab2_c3, for isolation of page allocation and free operations
 void load_user_program(process *proc) {
+
   int hartid = read_tp();
   sprint("hartid = %d: User application is loading.\n", hartid);
-  proc->trapframe->regs.tp = hartid;
+  // proc->trapframe->regs.tp = hartid; // set the thread pointer to the hartid, must be setted after alloc_page.
+
+  g_ufree_page[hartid] = USER_FREE_ADDRESS_START; // set the first free page in our simple heap. added @lab2_c3
   // allocate a page to store the trapframe. alloc_page is defined in kernel/pmm.c. added @lab2_1
   proc->trapframe = (trapframe *)alloc_page();
   memset(proc->trapframe, 0, sizeof(trapframe));
@@ -54,10 +58,12 @@ void load_user_program(process *proc) {
 
   // USER_STACK_TOP = 0x7ffff000, defined in kernel/memlayout.h
   proc->trapframe->regs.sp = USER_STACK_TOP;  //virtual address of user stack top
-  
+  proc->trapframe->regs.tp = hartid; // set the thread pointer to the hartid, must be setted after alloc_page.
+
+
   sprint("hartid = %d: user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n",hartid, proc->trapframe,
          proc->trapframe->regs.sp, proc->kstack);
-
+  // spin_unlock(&lock);
   // load_bincode_from_host_elf() is defined in kernel/elf.c
   load_bincode_from_host_elf(proc);
 
