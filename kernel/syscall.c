@@ -32,7 +32,7 @@ ssize_t sys_user_exit(uint64 code) {
   sprint("hartid = %d: User exit with code:%d.\n",hartid, code);
   // in lab1, PKE considers only one app (one process). 
   // therefore, shutdown the system when the app calls exit()
-  sprint("hartid = %d: shutdown with code:%d.\n",hartid, code);
+  // sprint("hartid = %d: shutdown with code:%d.\n",hartid, code);
   sync_barrier(&shutdown_flag, NCPU);
   if(hartid == 0)
   {
