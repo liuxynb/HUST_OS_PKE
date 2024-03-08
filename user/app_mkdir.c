@@ -9,7 +9,6 @@ int main(int argc, char *argv[]) {
 
   mkdir_u(new_dir);
   printu("mkdir: %s\n", new_dir);
-
   exit(0);
   return 0;
 }

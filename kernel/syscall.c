@@ -255,9 +255,24 @@ ssize_t sys_user_exec(char *path, char *para)
   strcpy(ppath_1, H_ROOT_DIR);
   strcpy(ppath_1+strlen(H_ROOT_DIR), ppath);
   sprint("Application: %s\n", ppath_1);
-  do_execv(ppath_1, ppara);
+  do_execv(ppath_1);
 
-  
+  char para_new[100];
+  strcpy(para_new, ppara);
+
+  // write exec parameter
+  char **argv_va = (char **)sys_user_allocate_page();
+  char *argv_0_va = (char *)sys_user_allocate_page();
+
+  char **argv_pa = user_va_to_pa(current->pagetable, (void *)argv_va);
+  argv_pa[0] = argv_0_va;
+
+  char *argv_0_pa = (char *)user_va_to_pa(current->pagetable, (void *)argv_0_va);
+
+  strcpy(argv_0_pa, para_new);
+
+  current->trapframe->regs.a0 = 1;
+  current->trapframe->regs.a1 = (uint64)argv_va;
   return 0;
   
 }
@@ -268,8 +283,8 @@ ssize_t sys_user_exec(char *path, char *para)
 //
 ssize_t sys_user_wait(int pid)
 {
-  ssize_t tmp = do_wait(pid);
   sprint("Now we are on the sys_user_wait func.\n");
+  ssize_t tmp = do_wait(pid);
   return tmp;
 }
 
@@ -294,6 +309,8 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
     return sys_user_fork();
   case SYS_user_yield:
     return sys_user_yield();
+  case SYS_user_wait:
+    return sys_user_wait(a1);
   // added @lab4_1
   case SYS_user_open:
     return sys_user_open((char *)a1, a2);
@@ -326,8 +343,6 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
   // added @lab4_c2
   case SYS_user_exec:
     return sys_user_exec((char *)a1, (char *)a2);
-  case SYS_user_wait:
-    return sys_user_wait(a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }
