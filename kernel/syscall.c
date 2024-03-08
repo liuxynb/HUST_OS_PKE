@@ -247,14 +247,17 @@ ssize_t sys_user_unlink(char *vfn)
 //
 // lib call to exec
 //
-ssize_t do_exec(char *path)
+ssize_t sys_user_exec(char *path, char *para)
 {
   char *ppath = (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)path);
-  char * ppath_1 = (char*)alloc_page();
+  char *ppara = (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)para);
+  char ppath_1[100];
   strcpy(ppath_1, H_ROOT_DIR);
   strcpy(ppath_1+strlen(H_ROOT_DIR), ppath);
   sprint("Application: %s\n", ppath_1);
-  do_execv(ppath_1);
+  do_execv(ppath_1, ppara);
+
+  
   return 0;
   
 }
@@ -322,7 +325,7 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
     return sys_user_unlink((char *)a1);
   // added @lab4_c2
   case SYS_user_exec:
-    return do_exec((char *)a1);
+    return sys_user_exec((char *)a1, (char *)a2);
   case SYS_user_wait:
     return sys_user_wait(a1);
   default:

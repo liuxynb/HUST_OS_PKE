@@ -38,6 +38,7 @@ process *current = NULL;
 //
 void switch_to(process *proc)
 {
+  // sprint("switch_to process %d.\n", proc->pid);
   assert(proc);
   current = proc;
 
@@ -266,7 +267,7 @@ int do_fork(process *parent)
 // added @lab4_c2
 // reclaim the open-file management data structure of a process.
 // exec会根据读入的可执行文件将'原进程'的数据段、代码段和堆栈段替换。
-int do_execv(char *path)
+int do_execv(char *path, char *para)
 {
   spike_file_t * file = spike_file_open(path,O_RDONLY, 0);
   if(IS_ERR_VALUE(file))

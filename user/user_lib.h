@@ -34,7 +34,7 @@ int link_u(const char *fn1, const char *fn2);
 int unlink_u(const char *fn);
 
 // added @ lab4_c2
-int exec(const char *path);
+int exec(const char *path, const char *para);
 
 #endif
 // added @lab3_challenge1

@@ -38,6 +38,7 @@ int main(int argc, char *argv[]) {
     printu("==========Command Start============\n\n");
     int pid = fork();
     if(pid == 0) {
+      // printu("==========111111============\n\n");
       int ret = exec(command, para);
       if (ret == -1)
       printu("exec failed!\n");

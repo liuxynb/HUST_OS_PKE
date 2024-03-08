@@ -11,10 +11,10 @@
 #include "vfs.h"
 #include "spike_interface/spike_utils.h"
 
-typedef struct elf_info_t {
-  struct file *f;
-  process *p;
-} elf_info;
+// typedef struct elf_info_t {
+//   struct file *f;
+//   process *p;
+// } elf_info;
 
 //
 // the implementation of allocater. allocates memory space for later segment loading.
@@ -63,11 +63,7 @@ static uint64 vfs_elf_pread(struct file *elf_file, void *dest, uint64 nb, uint64
   vfs_lseek(elf_file, offset, 0);
   return vfs_read(elf_file, dest, nb);
 }
-static uint64 vfs_elf_pread(struct file *elf_file, void *dest, uint64 nb, uint64 offset)
-{
-  vfs_lseek(elf_file, offset, 0);
-  return vfs_read(elf_file, dest, nb);
-}
+
 
 //
 // init elf_ctx, a data structure that loads the elf.
@@ -245,44 +241,44 @@ static size_t parse_args(arg_buf *arg_bug_msg)
 //
 // load the elf of user application, by using the spike file interface.
 //
-void load_bincode_from_host_elf(process *p)
-{
-  arg_buf arg_bug_msg;
+// void load_bincode_from_host_elf(process *p)
+// {
+//   arg_buf arg_bug_msg;
 
-  // retrieve command line arguements
-  size_t argc = parse_args(&arg_bug_msg);
-  if (!argc)
-    panic("You need to specify the application program!\n");
+//   // retrieve command line arguements
+//   size_t argc = parse_args(&arg_bug_msg);
+//   if (!argc)
+//     panic("You need to specify the application program!\n");
 
-  sprint("Application: %s\n", arg_bug_msg.argv[0]);
+//   sprint("Application: %s\n", arg_bug_msg.argv[0]);
 
-  // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading process.
-  elf_ctx elfloader;
-  // elf_info is defined above, used to tie the elf file and its corresponding process.
-  elf_info info;
+//   // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading process.
+//   elf_ctx elfloader;
+//   // elf_info is defined above, used to tie the elf file and its corresponding process.
+//   elf_info info;
 
-  info.f = vfs_open(filename, O_RDONLY);
-  info.p = p;
-  // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
-  if (IS_ERR_VALUE(info.f))
-    panic("Fail on openning the input application program.\n");
+//   info.f = vfs_open(filename, O_RDONLY);
+//   info.p = p;
+//   // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
+//   if (IS_ERR_VALUE(info.f))
+//     panic("Fail on openning the input application program.\n");
 
-  // init elfloader context. elf_init() is defined above.
-  if (elf_init(&elfloader, &info) != EL_OK)
-    panic("fail to init elfloader.\n");
+//   // init elfloader context. elf_init() is defined above.
+//   if (elf_init(&elfloader, &info) != EL_OK)
+//     panic("fail to init elfloader.\n");
 
-  // load elf. elf_load() is defined above.
-  if (elf_load(&elfloader) != EL_OK)
-    panic("Fail on loading elf.\n");
+//   // load elf. elf_load() is defined above.
+//   if (elf_load(&elfloader) != EL_OK)
+//     panic("Fail on loading elf.\n");
 
-  // entry (virtual, also physical in lab1_x) address
-  p->trapframe->epc = elfloader.ehdr.entry;
+//   // entry (virtual, also physical in lab1_x) address
+//   p->trapframe->epc = elfloader.ehdr.entry;
 
-  // close the host spike file
-  spike_file_close(info.f);
+//   // close the host spike file
+//   spike_file_close(info.f);
 
-  sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
-}
+//   sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
+// }
 
 void vfs_load_bincode_from_elf(process *p)
 {
