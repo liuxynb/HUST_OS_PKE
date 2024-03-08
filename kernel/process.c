@@ -17,7 +17,7 @@
 #include "memlayout.h"
 #include "sched.h"
 #include "spike_interface/spike_utils.h"
-
+#include <stdbool.h>
 
 // Two functions defined in kernel/usertrap.S
 extern char smode_trap_vector[];
@@ -176,7 +176,10 @@ int free_process(process *proc)
   // but for proxy kernel, it (memory leaking) may NOT be a really serious issue,
   // as it is different from regular OS, which needs to run 7x24.
   proc->status = ZOMBIE;
-
+  // sprint("process %d is free.\n", proc->pid);
+  if (proc->pid == 0) // 0号进程退出，程序终止
+    return 0;
+  wake_up(proc);
   return 0;
 }
 
@@ -191,7 +194,6 @@ int do_fork(process *parent)
 {
   sprint("will fork a child from parent %d.\n", parent->pid);
   process *child = alloc_process();
-
   for (int i = 0; i < parent->total_mapped_region; i++)
   {
     // browse parent's vm space, and copy its trapframe and data segments,
@@ -199,52 +201,13 @@ int do_fork(process *parent)
     switch (parent->mapped_info[i].seg_type)
     {
     case CONTEXT_SEGMENT:
-    {
       *child->trapframe = *parent->trapframe;
       break;
-    }
     case STACK_SEGMENT:
-    {
-      memcpy((void *)lookup_pa(child->pagetable, child->mapped_info[STACK_SEGMENT].va),
+      memcpy((void *)lookup_pa(child->pagetable, child->mapped_info[0].va),
              (void *)lookup_pa(parent->pagetable, parent->mapped_info[i].va), PGSIZE);
       break;
-    }
-    case HEAP_SEGMENT:
-    {
-      // build a same heap for child process.
-
-      // convert free_pages_address into a filter to skip reclaimed blocks in the heap
-      // when mapping the heap blocks
-      int free_block_filter[MAX_HEAP_PAGES];
-      memset(free_block_filter, 0, MAX_HEAP_PAGES);
-      uint64 heap_bottom = parent->user_heap.heap_bottom;
-      for (int i = 0; i < parent->user_heap.free_pages_count; i++)
-      {
-        int index = (parent->user_heap.free_pages_address[i] - heap_bottom) / PGSIZE;
-        free_block_filter[index] = 1;
-      }
-
-      // copy and map the heap blocks
-      for (uint64 heap_block = current->user_heap.heap_bottom;
-           heap_block < current->user_heap.heap_top; heap_block += PGSIZE)
-      {
-        if (free_block_filter[(heap_block - heap_bottom) / PGSIZE]) // skip free blocks
-          continue;
-
-        void *child_pa = alloc_page();
-        memcpy(child_pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
-        user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, (uint64)child_pa,
-                    prot_to_type(PROT_WRITE | PROT_READ, 1));
-      }
-
-      child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
-
-      // copy the heap manager from parent to child
-      memcpy((void *)&child->user_heap, (void *)&parent->user_heap, sizeof(parent->user_heap));
-      break;
-    }
     case CODE_SEGMENT:
-    {
       // TODO (lab3_1): implment the mapping of child code segment to parent's
       // code segment.
       // hint: the virtual address mapping of code segment is tracked in mapped_info
@@ -254,16 +217,6 @@ int do_fork(process *parent)
       // address region of child to the physical pages that actually store the code
       // segment of parent process.
       // DO NOT COPY THE PHYSICAL PAGES, JUST MAP THEM.
-      // panic( "You need to implement the code segment mapping of child in lab3_1.\n" );
-
-      // user_vm_map((pagetable_t)child->pagetable,
-      //             parent->mapped_info[CODE_SEGMENT].va,
-      //             parent->mapped_info[CODE_SEGMENT].npages * PGSIZE,
-      //             lookup_pa(parent->pagetable, parent->mapped_info[CODE_SEGMENT].va),
-      //             prot_to_type(PROT_READ | PROT_EXEC, 1));
-      // sprint("do_folk map code segment at pa:0x%lx of parent to child at va:0x%lx.\n", lookup_pa(parent->pagetable, parent->mapped_info[CODE_SEGMENT].va), parent->mapped_info[CODE_SEGMENT].va);
-      // break;
-
       for (int j = 0; j < parent->mapped_info[i].npages; j++)
       {
         uint64 addr = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
@@ -274,13 +227,31 @@ int do_fork(process *parent)
         sprint("do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
                addr, parent->mapped_info[i].va + j * PGSIZE);
       }
+
+      // after mapping, register the vm region (do not delete codes below!)
+      child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
+      child->mapped_info[child->total_mapped_region].npages =
+          parent->mapped_info[i].npages;
+      child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
+      child->total_mapped_region++;
+      break;
+    case DATA_SEGMENT:
+      for (int j = 0; j < parent->mapped_info[i].npages; j++)
+      {
+        uint64 addr = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
+        char *newaddr = alloc_page();
+        memcpy(newaddr, (void *)addr, PGSIZE);
+        map_pages(child->pagetable, parent->mapped_info[i].va + j * PGSIZE, PGSIZE,
+                  (uint64)newaddr, prot_to_type(PROT_WRITE | PROT_READ, 1));
+      }
+      // after mapping, register the vm region (do not delete codes below!)
+      child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
+      child->mapped_info[child->total_mapped_region].npages =
+          parent->mapped_info[i].npages;
+      child->mapped_info[child->total_mapped_region].seg_type = DATA_SEGMENT;
+      child->total_mapped_region++;
+      break;
     }
-    }
-    // after mapping, register the vm region (do not delete codes below!)
-    child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
-    child->mapped_info[child->total_mapped_region].npages = parent->mapped_info[i].npages;
-    child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
-    child->total_mapped_region++;
   }
 
   child->status = READY;
@@ -324,3 +295,63 @@ int do_execv(char *path)
   return 0;
 }
 
+
+//
+// wait function, added @lab3_challenge1
+//
+ssize_t do_wait(int pid)
+{
+  // If pid is -1, wait for any child process to exit.
+  // If pid is greater than 0, wait for the specific child process with the given pid.
+  // Return the pid of the exited child process.
+  // sprint("Now we are on the do_wait func.\n");
+  if (pid == -1)
+  {
+    bool isFound = false;
+    for (int i = 0; i < NPROC; i++)
+    {
+      if (procs[i].status == FREE || procs[i].parent == NULL)
+        continue;
+      if (procs[i].parent->pid == current->pid)
+      {
+        isFound = true;
+        // sprint("Now the process is found.\n");
+        if (procs[i].status == ZOMBIE)
+        {
+          procs[i].status = FREE;
+          return procs[i].pid; // return the pid of the exited child process.
+        }
+      }
+    }
+    // sprint("Now we did not find the zombie child.\n");
+    if (isFound == false) // no child process
+      return -1;
+    else // no zombie child process
+    {
+      // sprint("Now we insert the current process to the blocked queue.\n");
+      insert_to_blocked_queue(current);
+      // sprint("Now we schedule the process on do_wait.\n");
+      schedule();
+      return -2;
+    }
+  }
+  else if (pid > 0 && pid < NPROC)
+  {
+    if (procs[pid].parent->pid == current->pid)
+    {
+      if (procs[pid].status == ZOMBIE) // return immediately
+      {
+        procs[pid].status = ZOMBIE;
+        return pid;
+      }
+      else
+      {
+        insert_to_blocked_queue(current);
+        // sprint("Now we schedule the process on do_wait.\n");
+        schedule();
+        return -2;
+      }
+    }
+  }
+  return -1;
+}

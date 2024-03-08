@@ -9,8 +9,8 @@
 
 int printu(const char *s, ...);
 int exit(int code);
-void* naive_malloc();
-void naive_free(void* va);
+void *naive_malloc();
+void naive_free(void *va);
 int fork();
 void yield();
 
@@ -37,3 +37,5 @@ int unlink_u(const char *fn);
 int exec(const char *path);
 
 #endif
+// added @lab3_challenge1
+int wait(int pid);
