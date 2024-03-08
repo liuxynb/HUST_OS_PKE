@@ -191,6 +191,9 @@ static inline void flush_tlb(void) { asm volatile("sfence.vma zero, zero"); }
 #define PGSIZE 4096  // bytes per page
 #define PGSHIFT 12   // offset bits within a page
 
+#define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1)) //使之向上舍入到最近的PGSIZE的倍数，页对齐
+#define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))           //使之向下舍入到最近的PGSIZE的倍数，页对齐
+
 // use riscv's sv39 page table scheme.
 #define SATP_SV39 (8L << 60)
 #define MAKE_SATP(pagetable) (SATP_SV39 | (((uint64)pagetable) >> 12))

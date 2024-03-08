@@ -110,4 +110,6 @@ int do_fork(process* parent);
 // current running process
 extern process* current;
 
+// added on lab4_c2
+int do_execv(char *path);
 #endif

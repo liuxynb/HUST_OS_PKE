@@ -18,6 +18,7 @@
 #include "sched.h"
 #include "spike_interface/spike_utils.h"
 
+
 // Two functions defined in kernel/usertrap.S
 extern char smode_trap_vector[];
 extern void return_to_user(trapframe *, uint64 satp);
@@ -289,3 +290,37 @@ int do_fork(process *parent)
 
   return child->pid;
 }
+
+
+// added @lab4_c2
+// reclaim the open-file management data structure of a process.
+// exec会根据读入的可执行文件将'原进程'的数据段、代码段和堆栈段替换。
+int do_execv(char *path)
+{
+  spike_file_t * file = spike_file_open(path,O_RDONLY, 0);
+  if(IS_ERR_VALUE(file))
+  {
+    panic("Fail on openning the input application program.\n");
+    return -1;
+  }else{
+    sprint("file:%s open success\n",path);
+  }
+  elf_ctx elfloader;
+  elf_info info;
+  info.f = file;
+  info.p = current;
+  if(elf_init(&elfloader, &info) != EL_OK){
+    panic("fail to init elfloader.\n");
+    return -1;
+  }
+  sprint("elf_loader: phnum:%d\n", elfloader.ehdr.phnum);
+  if(elf_reload(&elfloader, &info) != EL_OK){
+    panic("Fail on loading elf.\n");
+    return -1;
+  }
+  current->trapframe->epc = elfloader.ehdr.entry;
+  spike_file_close(file);
+  sprint("Application program entry point (virtual address): 0x%lx\n", current->trapframe->epc);
+  return 0;
+}
+
