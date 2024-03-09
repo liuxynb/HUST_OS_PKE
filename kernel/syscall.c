@@ -249,34 +249,42 @@ ssize_t sys_user_unlink(char *vfn)
 //
 ssize_t sys_user_exec(char *path, char *para)
 {
+  // 将用户虚拟地址转换为物理地址
   char *ppath = (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)path);
   char *ppara = (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)para);
+
+  // 拼接完整路径
   char ppath_1[100];
   strcpy(ppath_1, H_ROOT_DIR);
-  strcpy(ppath_1+strlen(H_ROOT_DIR), ppath);
+  strcpy(ppath_1 + strlen(H_ROOT_DIR), ppath);
+
+  // 打印调试信息（可选）
   sprint("Application: %s\n", ppath_1);
+
+  // 执行程序
   do_execv(ppath_1);
 
+  // 处理程序参数
   char para_new[100];
   strcpy(para_new, ppara);
 
-  // write exec parameter
+  // 分配用于参数数组的内存
   char **argv_va = (char **)sys_user_allocate_page();
+  // 分配用于第一个参数字符串的内存
   char *argv_0_va = (char *)sys_user_allocate_page();
-
+  // 将 argv_va 的虚拟地址转换为物理地址
   char **argv_pa = user_va_to_pa(current->pagetable, (void *)argv_va);
+  // 将 argv_pa[0] 指向第一个参数
   argv_pa[0] = argv_0_va;
-
+  // 将参数字符串复制到第一个参数内存中
   char *argv_0_pa = (char *)user_va_to_pa(current->pagetable, (void *)argv_0_va);
-
   strcpy(argv_0_pa, para_new);
+  // 设置寄存器
+  current->trapframe->regs.a0 = 1;               // 参数个数
+  current->trapframe->regs.a1 = (uint64)argv_va; // 参数数组地址
 
-  current->trapframe->regs.a0 = 1;
-  current->trapframe->regs.a1 = (uint64)argv_va;
   return 0;
-  
 }
-
 
 //
 // kerenl entry point of yield. added @lab3_challenge1
