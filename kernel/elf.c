@@ -35,6 +35,20 @@ static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 siz
 
   return pa;
 }
+
+static void *elf_process_alloc_mb(process *p, uint64 elf_pa, uint64 elf_va, uint64 size) {
+  // we assume that size of proram segment is smaller than a page.
+  kassert(size < PGSIZE);
+  void *pa = alloc_page();
+  if (pa == 0) panic("uvmalloc mem alloc falied\n");
+
+  // why !!!!!!!!!!
+  // memset((void *)pa, 0, PGSIZE);
+  user_vm_map(p->pagetable, elf_va, PGSIZE, (uint64)pa,
+         prot_to_type(PROT_WRITE | PROT_READ | PROT_EXEC, 1));
+  return pa;
+}
+
 static void *vfs_elf_alloc_mb(process *p, uint64 elf_pa, uint64 elf_va, uint64 size)
 {
   // we assume that size of proram segment is smaller than a page.
@@ -313,15 +327,21 @@ void vfs_load_bincode_from_elf(process *p)
   sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
 }
 
-// added on lab4_c2, reload the elf file.
-elf_status elf_reload(elf_ctx *ctx, elf_info *info)
+// added on lab4_c2, reload the elf file. 
+elf_status elf_reload(process *p, elf_ctx *ctx, struct file *file)
 {
   elf_prog_header ph_addr;
   int i, off;
+
   for (i = 0, off = ctx->ehdr.phoff; i < ctx->ehdr.phnum; i++, off += sizeof(ph_addr))
   {
-    if (elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr))
+    // seek to the program header
+    vfs_lseek(file, off, 0); 
+    // read the program header
+    if(vfs_read(file, (char *)&ph_addr, sizeof(ph_addr)) != sizeof(ph_addr)) 
+    {
       return EL_EIO;
+    }
     if (ph_addr.type != ELF_PROG_LOAD)
       continue;
     if (ph_addr.memsz < ph_addr.filesz)
@@ -333,18 +353,18 @@ elf_status elf_reload(elf_ctx *ctx, elf_info *info)
       // 代码段
       for (int j = 0; j < PGSIZE / sizeof(mapped_region); j++)
       {
-        if (info->p->mapped_info[j].seg_type == CODE_SEGMENT)
+        if (p->mapped_info[j].seg_type == CODE_SEGMENT)
         {
           sprint("CODE_SEGMENT added at mapped info offset:%d\n", j);
           // 释放原来的代码段
-          user_vm_unmap((pagetable_t)info->p->pagetable, info->p->mapped_info[j].va, PGSIZE, 1);
+          user_vm_unmap(p->pagetable, p->mapped_info[j].va, PGSIZE, 0);
           // 重新映射新的代码段
-          void *dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
-          if (elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
+          void *dest = elf_process_alloc_mb(p, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
+          p->mapped_info[j].va = ph_addr.vaddr;
+          vfs_lseek(file, ph_addr.off, 0); 
+          if(vfs_read(file, dest, ph_addr.memsz) != ph_addr.memsz) {
             return EL_EIO;
-          info->p->mapped_info[j].va = ph_addr.vaddr;
-          info->p->mapped_info[j].npages = 1;
-          info->p->mapped_info[j].seg_type = CODE_SEGMENT;
+          }
           break;
         }
       }
@@ -355,36 +375,37 @@ elf_status elf_reload(elf_ctx *ctx, elf_info *info)
       int found = 0; // 标记是否找到了数据段
       for (int j = 0; j < PGSIZE / sizeof(mapped_region); j++)
       {
-        if (info->p->mapped_info[j].seg_type == DATA_SEGMENT)
+        if (p->mapped_info[j].seg_type == DATA_SEGMENT)
         {
           sprint("DATA_SEGMENT added at mapped info offset:%d\n", j);
           // 释放原来的数据段
-          user_vm_unmap((pagetable_t)info->p->pagetable, info->p->mapped_info[j].va, PGSIZE, 1);
+          user_vm_unmap((pagetable_t)p->pagetable, p->mapped_info[j].va, PGSIZE, 1);
           // 重新映射新的数据段
-          void *dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
-          if (elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
+          void *dest = elf_process_alloc_mb(p, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
+          vfs_lseek(file, ph_addr.off, 0); // seek to the data segment
+          p->mapped_info[j].va = ph_addr.vaddr;
+          if(vfs_read(file, dest, ph_addr.memsz) != ph_addr.memsz) {
             return EL_EIO;
-          info->p->mapped_info[j].va = ph_addr.vaddr;
-          info->p->mapped_info[j].npages = 1;
-          info->p->mapped_info[j].seg_type = DATA_SEGMENT;
+          }
           found = 1;
           break;
         }
       }
       if (found == 0)
       { // 不存在数据段, 则不需要释放原来的数据段
-        void *dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
-        if (elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
-          return EL_EIO;
+        void *dest = elf_process_alloc_mb(p, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
+        vfs_lseek(file, ph_addr.off, 0);
+        if(vfs_read(file, dest, ph_addr.memsz) != ph_addr.memsz)
+            return EL_EIO;
         for (int j = 0; j < PGSIZE / sizeof(mapped_region); j++)
         {
-          if (info->p->mapped_info[j].va == 0)
+          if (p->mapped_info[j].va == 0)
           {
             sprint("DATA_SEGMENT added at mapped info offset:%d\n", j);
-            info->p->mapped_info[j].npages = 1;
-            info->p->mapped_info[j].va = ph_addr.vaddr;
-            info->p->mapped_info[j].seg_type = DATA_SEGMENT;
-            info->p->total_mapped_region++;
+            p->mapped_info[j].npages = 1;
+            p->mapped_info[j].va = ph_addr.vaddr;
+            p->mapped_info[j].seg_type = DATA_SEGMENT;
+            p->total_mapped_region++;
             break;
           }
         }
@@ -395,5 +416,16 @@ elf_status elf_reload(elf_ctx *ctx, elf_info *info)
       panic("unknown program segment encountered, segment flag:%d.\n", ph_addr.flags);
     }
   }
+  // clear the heap segment
+  // for(int j = 0; j < PGSIZE / sizeof(mapped_region); j++) {
+  //   if(p->mapped_info[j].seg_type == HEAP_SEGMENT) {
+  //     for(uint64 va = p->user_heap.heap_bottom; va < p->user_heap.heap_top; va += PGSIZE) {
+  //       user_vm_unmap(p->pagetable, va, PGSIZE, 1); // free the page at the same time
+  //     }
+  //     p->mapped_info[j].npages = 0;
+  //     p->user_heap.heap_top = p->user_heap.heap_bottom;
+  //   }
+  // }
   return EL_OK;
 }
+

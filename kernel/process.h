@@ -118,5 +118,5 @@ ssize_t do_wait(int pid);
 extern process *current;
 
 // added on lab4_c2
-int do_execv(char *path);
+int do_exec(char *path);
 #endif

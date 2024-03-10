@@ -71,5 +71,5 @@ elf_status elf_load(elf_ctx *ctx);
 
 void load_bincode_from_host_elf(process *p);
 void vfs_load_bincode_from_elf(process *p);
-elf_status elf_reload(elf_ctx * ctx, elf_info * info);
+elf_status elf_reload(process *p, elf_ctx *ctx, struct file *file);
 #endif

@@ -199,6 +199,7 @@ int do_fork(process *parent)
   {
     // browse parent's vm space, and copy its trapframe and data segments,
     // map its code segment.
+    int free_block_filter[MAX_HEAP_PAGES];
     switch (parent->mapped_info[i].seg_type)
     {
     case CONTEXT_SEGMENT:
@@ -208,27 +209,28 @@ int do_fork(process *parent)
       memcpy((void *)lookup_pa(child->pagetable, child->mapped_info[0].va),
              (void *)lookup_pa(parent->pagetable, parent->mapped_info[i].va), PGSIZE);
       break;
-    case HEAP_SEGMENT: 
+    case HEAP_SEGMENT:
       // build a same heap for child process.
 
       // convert free_pages_address into a filter to skip reclaimed blocks in the heap
       // when mapping the heap blocks
-      int free_block_filter[MAX_HEAP_PAGES];
       memset(free_block_filter, 0, MAX_HEAP_PAGES);
       uint64 heap_bottom = parent->user_heap.heap_bottom;
-      for (int i = 0; i < parent->user_heap.free_pages_count; i++) {
+      for (int i = 0; i < parent->user_heap.free_pages_count; i++)
+      {
         int index = (parent->user_heap.free_pages_address[i] - heap_bottom) / PGSIZE;
         free_block_filter[index] = 1;
       }
 
       // copy and map the heap blocks
       for (uint64 heap_block = current->user_heap.heap_bottom;
-            heap_block < current->user_heap.heap_top; heap_block += PGSIZE) {
-        if (free_block_filter[(heap_block - heap_bottom) / PGSIZE])  // skip free blocks
+           heap_block < current->user_heap.heap_top; heap_block += PGSIZE)
+      {
+        if (free_block_filter[(heap_block - heap_bottom) / PGSIZE]) // skip free blocks
           continue;
 
-        void* child_pa = alloc_page();
-        memcpy(child_pa, (void*)lookup_pa(parent->pagetable, heap_block), PGSIZE);
+        void *child_pa = alloc_page();
+        memcpy(child_pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
         user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, (uint64)child_pa,
                     prot_to_type(PROT_WRITE | PROT_READ, 1));
       }
@@ -236,7 +238,7 @@ int do_fork(process *parent)
       child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
 
       // copy the heap manager from parent to child
-      memcpy((void*)&child->user_heap, (void*)&parent->user_heap, sizeof(parent->user_heap));
+      memcpy((void *)&child->user_heap, (void *)&parent->user_heap, sizeof(parent->user_heap));
       break;
     case CODE_SEGMENT:
       // TODO (lab3_1): implment the mapping of child code segment to parent's
@@ -293,39 +295,73 @@ int do_fork(process *parent)
   return child->pid;
 }
 
-
 // added @lab4_c2
 // reclaim the open-file management data structure of a process.
 // exec会根据读入的可执行文件将'原进程'的数据段、代码段和堆栈段替换。
-int do_execv(char *path)
+int do_exec(char *path)
 {
-  spike_file_t * file = spike_file_open(path,O_RDONLY, 0);
-  if(IS_ERR_VALUE(file))
+  // remove using spike interface
+  // spike_file_t * file = spike_file_open(path,O_RDONLY, 0);
+  // if(IS_ERR_VALUE(file))
+  // {
+  //   panic("Fail on openning the input application program.\n");
+  //   return -1;
+  // }else{
+  //   sprint("file:%s open success\n",path);
+  // }
+  // elf_ctx elfloader;
+  // elf_info info;
+  // info.f = file;
+  // info.p = current;
+  // if(elf_init(&elfloader, &info) != EL_OK){
+  //   panic("fail to init elfloader.\n");
+  //   return -1;
+  // }
+  // sprint("elf_loader: phnum:%d\n", elfloader.ehdr.phnum);
+  // if(elf_reload(&elfloader, &info) != EL_OK){
+  //   panic("Fail on loading elf.\n");
+  //   return -1;
+  // }
+  // current->trapframe->epc = elfloader.ehdr.entry;
+  // spike_file_close(file);
+  // sprint("Application program entry point (virtual address): 0x%lx\n", current->trapframe->epc);
+  // return 0;
+
+  // using the vfs interface.
+  elf_ctx elfloader;
+  elf_ctx *ctx = &elfloader;
+  sprint("Application: %s\n", path);
+  struct file *elf_file = vfs_open(path, O_RDONLY);
+  if (elf_file == NULL)
   {
     panic("Fail on openning the input application program.\n");
     return -1;
-  }else{
-    sprint("file:%s open success\n",path);
   }
-  elf_ctx elfloader;
-  elf_info info;
-  info.f = file;
-  info.p = current;
-  if(elf_init(&elfloader, &info) != EL_OK){
-    panic("fail to init elfloader.\n");
-    return -1;
+  // read the elf header
+  if (vfs_read(elf_file, (char *)&ctx->ehdr, sizeof(ctx->ehdr)) != sizeof(ctx->ehdr))
+  {
+    panic("error when reading elf header");
   }
-  sprint("elf_loader: phnum:%d\n", elfloader.ehdr.phnum);
-  if(elf_reload(&elfloader, &info) != EL_OK){
+  // check the signature (magic value) of the elf, if not correct, panic.
+  if (ctx->ehdr.magic != ELF_MAGIC)
+  {
+    panic("error when checking elf magic number");
+  }
+  process *p = current;
+  if(elf_reload(p, ctx, elf_file) != EL_OK){
     panic("Fail on loading elf.\n");
     return -1;
   }
-  current->trapframe->epc = elfloader.ehdr.entry;
-  spike_file_close(file);
-  sprint("Application program entry point (virtual address): 0x%lx\n", current->trapframe->epc);
+  else
+  {
+    // xsprint("elf_load ok : phnum:%d\n", ctx->ehdr.phnum);
+  }
+  p->trapframe->epc = elfloader.ehdr.entry;
+  // close the vfs file
+  vfs_close(elf_file);
+  sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
   return 0;
 }
-
 
 //
 // wait function, added @lab3_challenge1
@@ -378,7 +414,7 @@ ssize_t do_wait(int pid)
       else
       {
         insert_to_blocked_queue(current);
-        sprint("Now we schedule the process on do_wait.\n");
+        // sprint("Now we schedule the process on do_wait.\n");
         schedule();
         return -2;
       }

@@ -253,21 +253,19 @@ ssize_t sys_user_exec(char *path, char *para)
   char *ppath = (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)path);
   char *ppara = (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)para);
 
-  // 拼接完整路径
-  char ppath_1[100];
-  strcpy(ppath_1, H_ROOT_DIR);
-  strcpy(ppath_1 + strlen(H_ROOT_DIR), ppath);
-
+  // // 拼接完整路径
+  // char ppath_1[100];
+  // strcpy(ppath_1, H_ROOT_DIR);
+  // strcpy(ppath_1 + strlen(H_ROOT_DIR), ppath);
   // 打印调试信息（可选）
-  sprint("Application: %s\n", ppath_1);
+  // sprint("Application: %s\n", ppath);
 
-  // 执行程序
-  do_execv(ppath_1);
-
+  // added at lab4_c3, modified from lab4_c2. reference https://github.com/uniqueFranky/riscv-pke, thanks to Franky and his work.
   // 处理程序参数
   char para_new[100];
   strcpy(para_new, ppara);
-
+  // 执行程序
+  do_exec(ppath);
   // 分配用于参数数组的内存
   char **argv_va = (char **)sys_user_allocate_page();
   // 分配用于第一个参数字符串的内存
@@ -291,7 +289,7 @@ ssize_t sys_user_exec(char *path, char *para)
 //
 ssize_t sys_user_wait(int pid)
 {
-  sprint("Now we are on the sys_user_wait func.\n");
+  // sprint("Now we are on the sys_user_wait func.\n");
   ssize_t tmp = do_wait(pid);
   return tmp;
 }
