@@ -9,8 +9,8 @@
 
 int printu(const char *s, ...);
 int exit(int code);
-void *naive_malloc();
-void naive_free(void *va);
+void* naive_malloc();
+void naive_free(void* va);
 int fork();
 void yield();
 
@@ -32,10 +32,23 @@ int closedir_u(int fd);
 // added @ lab4_3
 int link_u(const char *fn1, const char *fn2);
 int unlink_u(const char *fn);
-
-// added @ lab4_c2
-int exec(const char *path, const char *para);
-
-#endif
-// added @lab3_challenge1
+int exec(char * command,char * para);
 int wait(int pid);
+
+// added @challengeX
+int scanu(const char *s, ...);
+
+// added cd & pwd
+void pwd(char * path);
+void cd(const char *path);
+
+// added lab3_ch2
+int sem_new(int value);
+int sem_P(int sem_id);
+int sem_V(int sem_id);
+
+// added lab1_ch1
+int print_backtrace(int n);
+// added @lab3_c3
+void printpa(int *va);
+#endif

@@ -117,10 +117,12 @@ struct file *vfs_open(const char *path, int flags) {
 
   // file does not exist
   if (!file_dentry) {
+    sprint("file does not exist!\n");
     int creatable = flags & O_CREAT;
 
     // create the file if O_CREAT bit is set
     if (creatable) {
+      sprint("vfs_open: file does not exist, and O_CREAT bit is set!\n");
       char basename[MAX_PATH_LEN];
       get_base_name(path, basename);
 
@@ -143,6 +145,8 @@ struct file *vfs_open(const char *path, int flags) {
       sprint("vfs_open: cannot find the file!\n");
       return NULL;
     }
+  }else{
+    // sprint("file exists!\n");
   }
 
   if (file_dentry->dentry_inode->type != FILE_I) {

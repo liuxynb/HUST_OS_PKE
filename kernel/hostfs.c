@@ -249,6 +249,7 @@ int hostfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinod
 int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
   panic("hostfs_readdir not implemented!\n");
   return -1;
+  
 }
 
 struct vinode *hostfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {

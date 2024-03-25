@@ -91,6 +91,8 @@ void timerinit(uintptr_t hartid) {
 // m_start: machine mode C entry point.
 //
 void m_start(uintptr_t hartid, uintptr_t dtb) {
+
+    //M态初始化，返回到S态
   // init the spike file interface (stdin,stdout,stderr)
   // functions with "spike_" prefix are all defined in codes under spike_interface/,
   // sprint is also defined in spike_interface/spike_utils.c

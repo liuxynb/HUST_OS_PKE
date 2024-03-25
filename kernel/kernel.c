@@ -64,13 +64,18 @@ static size_t parse_args(arg_buf *arg_bug_msg) {
 // load_bincode_from_host_elf is defined in elf.c
 //
 process* load_user_program() {
-  process* proc;
 
-  proc = alloc_process();
+  process* proc;
+  proc = alloc_process();//分配一个进程
   sprint("User application is loading.\n");
 
-  // load_bincode_from_host_elf(proc);
-  vfs_load_bincode_from_elf(proc);
+  arg_buf arg_bug_msg;
+
+  // retrieve command line arguements
+  size_t argc = parse_args(&arg_bug_msg);
+  if (!argc) panic("You need to specify the application program!\n");
+
+  load_bincode_from_host_elf(proc, arg_bug_msg.argv[0]);
   return proc;
 }
 
@@ -78,6 +83,8 @@ process* load_user_program() {
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
 int s_start(void) {
+
+    //S态初始化，返回到U态
   sprint("Enter supervisor mode...\n");
   // in the beginning, we use Bare mode (direct) memory mapping as in lab1.
   // but now, we are going to switch to the paging mode @lab2_1.

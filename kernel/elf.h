@@ -4,6 +4,7 @@
 #include "util/types.h"
 #include "process.h"
 
+
 #define MAX_CMDLINE_ARGS 64
 
 // elf header structure
@@ -42,6 +43,35 @@ typedef struct elf_prog_header_t {
   uint64 align;  /* Segment alignment */
 } elf_prog_header;
 
+// elf section header
+typedef struct elf_sect_header_t{
+    uint32 name;
+    uint32 type;
+    uint64 flags;
+    uint64 addr;
+    uint64 offset;
+    uint64 size;
+    uint32 link;
+    uint32 info;
+    uint64 addralign;
+    uint64 entsize;
+} elf_sect_header;
+
+
+// compilation units header (in debug line section)
+typedef struct __attribute__((packed)) {
+    uint32 length;
+    uint16 version;
+    uint32 header_length;
+    uint8 min_instruction_length;
+    uint8 default_is_stmt;
+    int8 line_base;
+    uint8 line_range;
+    uint8 opcode_base;
+    uint8 std_opcode_lengths[12];
+} debug_header;
+
+
 #define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
 #define ELF_PROG_LOAD 1
 
@@ -60,16 +90,27 @@ typedef struct elf_ctx_t {
   elf_header ehdr;
 } elf_ctx;
 
-typedef struct elf_info_t {
-  spike_file_t *f;
-  process *p;
-} elf_info;
+//added lab1_ch1
 
+// elf_symbol --符号表项结构
+typedef struct elf_symbol_t {
+  uint32 st_name; /* Symbol name (string tbl index) */
+  uint8 st_info;  /* Symbol type and binding */
+  uint8 st_other; /* Symbol visibility */
+  uint16 st_shndx; /* Section index,节的索引 */
+  uint64 st_value; /* Symbol value ,地址*/
+  uint64 st_size; /* Symbol size ，符号大小*/
+} elf_sym;
+
+// symbol table -- 符号表
+struct elf_sym_table{
+    elf_sym sym[64];
+    char sym_names[64][32];
+    int sym_count;
+};
 
 elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
-
-void load_bincode_from_host_elf(process *p);
-void vfs_load_bincode_from_elf(process *p);
-elf_status elf_reload(process *p, elf_ctx *ctx, struct file *file);
+elf_status elf_change(process *p, elf_ctx *ctx, struct file *file);
+void load_bincode_from_host_elf(process *p,char* filename);
 #endif

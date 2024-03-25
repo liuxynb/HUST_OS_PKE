@@ -12,6 +12,7 @@
 
 .globl _mentry
 _mentry:
+    # 函数入口
     # [mscratch] = 0; mscratch points the stack bottom of machine mode computer
     csrw mscratch, x0
 
