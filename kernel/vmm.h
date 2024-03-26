@@ -48,5 +48,5 @@ void user_better_malloc(uint64 n);
 void mcb_init();
 uint64 malloc(int n);
 void free(void *  va);
-
+void heap_copy_on_write(process *child, process *parent, uint64 pa);
 #endif

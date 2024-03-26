@@ -10,7 +10,7 @@
 
 int main(void)
 {
-  int *heap_data = (int *)better_malloc(128);
+  int *heap_data = (int *)malloc(128);
   printu("the physical address of parent process heap is: ");
   printpa(heap_data);
   int pid = fork();
