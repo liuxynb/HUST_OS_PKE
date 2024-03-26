@@ -159,12 +159,16 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
   process *p = ((elf_info *)ctx->info)->p;
   // directory name char pointer array
   p->dir = (char **)((((uint64)debug_line + length + 7) >> 3) << 3);
+  memset(p->dir, 0, 64 * sizeof(char *));
+
   int dir_ind = 0, dir_base;
   // file name char pointer array
   p->file = (code_file *)(p->dir + 64);
+  memset(p->file, 0, 64 * sizeof(code_file));
   int file_ind = 0, file_base;
   // table array
   p->line = (addr_line *)(p->file + 64);
+  memset(p->line, 0, 64 * sizeof(addr_line));
   p->line_ind = 0;
   char *off = debug_line;
   while (off < debug_line + length)
@@ -192,6 +196,7 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length)
       uint64 dir;
       read_uleb128(&dir, &off);
       p->file[file_ind++].dir = dir - 1 + dir_base;
+      // sprint("file:%s\n", p->file[file_ind - 1].file);
       read_uleb128(NULL, &off);
       read_uleb128(NULL, &off);
     }
@@ -339,93 +344,40 @@ elf_status elf_load(elf_ctx *ctx) {
 
     ((process*)(((elf_info*)(ctx->info))->p))->total_mapped_region ++;
   }
-
-  return EL_OK;
-}
-elf_status vfs_elf_load(process *p, elf_ctx *ctx, struct file *elf_file) {
-  // elf_prog_header structure is defined in kernel/elf.h
-  elf_prog_header ph_addr;
-  int i, off;
-  uint64 top = 0;
-  // traverse the elf program segment headers
-  for (i = 0, off = ctx->ehdr.phoff; i < ctx->ehdr.phnum; i++, off += sizeof(ph_addr)) {
-    // read segment headers
-    if (vfs_elf_pread(elf_file, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr)) return EL_EIO;
-    
-    if (ph_addr.type != ELF_PROG_LOAD) continue;
-    if (ph_addr.memsz < ph_addr.filesz) return EL_ERR;
-    if (ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr) return EL_ERR;
-
-    // allocate memory block before elf loading
-    void *dest = elf_process_alloc_mb(p, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
-
-    // actual loading
-    if (vfs_elf_pread(elf_file, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
-      return EL_EIO;
-      // 更新top--top为elf程序段的最大地址
-    if (ph_addr.vaddr + ph_addr.memsz > top) top = ph_addr.vaddr + ph_addr.memsz;
-
-    // record the vm region in proc->mapped_info. added @lab3_1
-    int j;
-    for( j=0; j<PGSIZE/sizeof(mapped_region); j++ ) //seek the last mapped region
-      if( p->mapped_info[j].va == 0x0 ) break;
-
-    p->mapped_info[j].va = ph_addr.vaddr;
-    p->mapped_info[j].npages = 1;
-
-    // SEGMENT_READABLE, SEGMENT_EXECUTABLE, SEGMENT_WRITABLE are defined in kernel/elf.h
-    if( ph_addr.flags == (SEGMENT_READABLE|SEGMENT_EXECUTABLE) ){
-      p->mapped_info[j].seg_type = CODE_SEGMENT;
-      // sprint( "CODE_SEGMENT added at mapped info offset:%d\n", j );
-    }else if ( ph_addr.flags == (SEGMENT_READABLE|SEGMENT_WRITABLE) ){
-      p->mapped_info[j].seg_type = DATA_SEGMENT;
-      // sprint( "DATA_SEGMENT added at mapped info offset:%d\n", j );
-    }else
-      panic( "unknown program segment encountered, segment flag:%d.\n", ph_addr.flags );
-
-    p->total_mapped_region ++;
-  }
-
+  /***** Part2 遍历所有的section header，找到.debug_line section，并进行解析 ****/
   elf_sect_header shstrtab,tmp;
 
   //读入shstrtab
-  // elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr)
-  // vfs_elf_pread(elf_file, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr)
-  if(vfs_elf_pread(elf_file,(void*)&shstrtab,sizeof(shstrtab),
+
+  if(elf_fpread(ctx,(void*)&shstrtab,sizeof(shstrtab),
                 ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(shstrtab)) != sizeof(shstrtab))
       return EL_EIO;
-  else{
-    sprint("shstrtab 读入成功\n");
-  }
   for(i=0,off=ctx->ehdr.shoff;i < ctx->ehdr.shnum;i++,off+=sizeof(tmp)){
       //读入section header_i
-    if(vfs_elf_pread(elf_file,(void*)&tmp,sizeof(tmp),off) != sizeof(tmp))
+    if(elf_fpread(ctx,(void*)&tmp,sizeof(tmp),off) != sizeof(tmp))
         return EL_EIO;
-    else{
-      sprint("section header 读入成功\n");
-    }
     char all_name[shstrtab.size];
     //读入shstrtab中的所有字符串
-    vfs_elf_pread(elf_file,&all_name,shstrtab.size,shstrtab.offset);
+    elf_fpread(ctx,&all_name,shstrtab.size,shstrtab.offset);
 
     //判断是否为.debug_line section
     if(strcmp(".debug_line",all_name+tmp.name) == 0){
-      sprint("debug_line section 开始读入\n");
-      if(vfs_elf_pread(elf_file,p->debugline,tmp.size,tmp.offset) != tmp.size)
+
+      if(elf_fpread(ctx, ((process*)(((elf_info*)(ctx->info))->p))->debugline,tmp.size,tmp.offset) != tmp.size){
           return EL_EIO;
-      else{
-        sprint("debug_line 读入成功\n");
-        sprint("debug_line size:%d\n",tmp.size);
-        sprint("debug_line == %s\n",p->debugline);
       }
-        // make_addr_line(ctx,*,tmp.size,p);
-        make_addr_line(ctx,p->debugline,tmp.size);
+      else{
+        // sprint("debug_line section loaded, size:%d\n", tmp.size);
+        // sprint("debug_line==%s\n", ((process*)(((elf_info*)(ctx->info))->p))->debugline);
+      }
+        make_addr_line(ctx, ((process*)(((elf_info*)(ctx->info))->p))->debugline,tmp.size);
         break;
     }
   }
 
   return EL_OK;
 }
+
 
 void load_sym_tab(elf_ctx * elf_ctx){
     elf_sect_header shstrtab;

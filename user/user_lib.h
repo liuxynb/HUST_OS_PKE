@@ -51,4 +51,8 @@ int sem_V(int sem_id);
 int print_backtrace(int n);
 // added @lab3_c3
 void printpa(int *va);
+// added @lab2_c2
+void *better_malloc(int n);
+void better_free(void *va);
+
 #endif

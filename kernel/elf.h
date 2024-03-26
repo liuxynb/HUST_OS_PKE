@@ -111,6 +111,5 @@ struct elf_sym_table{
 
 elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
-elf_status elf_change(process *p, elf_ctx *ctx, struct file *file);
 void load_bincode_from_host_elf(process *p,char* filename);
 #endif

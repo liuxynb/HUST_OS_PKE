@@ -290,11 +290,11 @@ int do_fork(process *parent) {
 
     //将父进程的char debugline[32768]; char **dir; code_file *file; addr_line *line; int line_ind;复制给子进程
     // child->debugline = parent->debugline;
-    strcpy(child->debugline, parent->debugline);
-    child->dir = parent->dir;
-    child->file = parent->file;
-    child->line = parent->line;
-    child->line_ind = parent->line_ind;
+    // strcpy(child->debugline, parent->debugline);
+    // child->dir = parent->dir;
+    // child->file = parent->file;
+    // child->line = parent->line;
+    // child->line_ind = parent->line_ind;
     insert_to_ready_queue(child);
     // sprint("cwd of parent is %s\n", parent->pfiles->cwd->name);
     // sprint("cwd of child is %s\n", child->pfiles->cwd->name);
