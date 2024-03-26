@@ -17,7 +17,10 @@ uint64 sum_sequence(uint64 n, int *p) {
   if (n == 0)
     return 0;
   else
-    return *p=sum_sequence( n-1, p+1 ) + n;
+  {
+    printu("n: %ld, p: %p\n", n, p);
+  }
+  return *p=sum_sequence( n-1, p+1 ) + n;
 }
 
 int main(void) {

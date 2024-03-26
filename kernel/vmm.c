@@ -330,15 +330,6 @@ uint64 malloc(int n)
   mcb_init();
   mem_control_block *head = (mem_control_block *)current->mcb_head;
   mem_control_block *tail = (mem_control_block *)current->mcb_tail;
-
-  //    Debug  内存控制块链表的遍历
-  //    mem_control_block  * p = head;
-  //    while(1){
-  //        sprint("block: offset: %d, size: %d, is_available: %d\n", p->offset, p->size, p->is_available);
-  //        if(p->next == tail) break;
-  //        p = p->next;
-  //    }
-  //    sprint("\n");
   while (1)
   { // 从头到尾遍历内存控制块链表，找到第一个可用的内存块
     //        sprint("block: offset: %d, size: %d, is_available: %d\n", head->offset, head->size, head->is_available);

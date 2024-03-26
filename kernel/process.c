@@ -232,14 +232,10 @@ int do_fork(process *parent)
                    (void *)lookup_pa(parent->pagetable, parent->mapped_info[i].va), PGSIZE);
             break;
         case HEAP_SEGMENT:
-        // build a same heap for child process.
-
-        // convert free_pages_address into a filter to skip reclaimed blocks in the heap
-        // when mapping the heap blocks
         {
             // 需要复制父进程的堆空间
             for (uint64 heap_block = current->user_heap.heap_bottom;
-                    heap_block < current->user_heap.heap_top; heap_block += PGSIZE)
+                 heap_block < current->user_heap.heap_top; heap_block += PGSIZE)
             {
                 uint64 parent_pa = lookup_pa(parent->pagetable, heap_block);
                 // 使用写时复制模式映射堆空间
@@ -258,6 +254,7 @@ int do_fork(process *parent)
                     panic("error when mapping heap segment!");
                 }
                 *parent_pte &= (~PTE_W); // 设置父进程的pte为只读
+                sprint("heap mapping: parent_pa = %lx, child_pa = %lx\n\n\n\n", parent_pa, lookup_pa(child->pagetable, heap_block));
             }
             child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
             memcpy((void *)&child->user_heap, (void *)&parent->user_heap, sizeof(parent->user_heap));
@@ -287,12 +284,10 @@ int do_fork(process *parent)
             for (int j = 0; j < parent->mapped_info[i].npages; j++)
             {
                 uint64 addr = lookup_pa(parent->pagetable, parent->mapped_info[i].va + j * PGSIZE);
-                char *newaddr = alloc_page();
-                memcpy(newaddr, (void *)addr, PGSIZE);
+                // 使用写时复制模式映射数据段
                 map_pages(child->pagetable, parent->mapped_info[i].va + j * PGSIZE, PGSIZE,
-                          (uint64)newaddr, prot_to_type(PROT_WRITE | PROT_READ, 1));
+                          addr, prot_to_type(PROT_READ, 1)); // 只读映射
             }
-            // after mapping, register the vm region (do not delete codes below!)
             child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
             child->mapped_info[child->total_mapped_region].npages =
                 parent->mapped_info[i].npages;
@@ -300,7 +295,7 @@ int do_fork(process *parent)
             child->total_mapped_region++;
             break;
         }
-    }
+        }
     }
 
     child->status = READY;

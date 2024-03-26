@@ -51,19 +51,6 @@ int exit(int code) {
   return do_user_call(SYS_user_exit, code, 0, 0, 0, 0, 0, 0); 
 }
 
-// //
-// // lib call to naive_malloc
-// //
-// void* naive_malloc() {
-//   return (void*)do_user_call(SYS_user_allocate_page, 0, 0, 0, 0, 0, 0, 0);
-// }
-
-// //
-// // lib call to naive_free
-// //
-// void naive_free(void* va) {
-//   do_user_call(SYS_user_free_page, (uint64)va, 0, 0, 0, 0, 0, 0);
-// }
 
 //
 // lib call to naive_fork
