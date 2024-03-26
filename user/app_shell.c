@@ -10,7 +10,7 @@
 int main(int argc, char *argv[]) {
   printu("\n======== HUST-PKE Shell Start ========\n\n");
   char command[128], para[128], cwd[128];
-  char username[128] = "user";
+  char username[128] = "root";
   char password[128] = "123456";
   // char input_username[128], input_password[128];
   // int cnt = 0;
@@ -61,12 +61,7 @@ int main(int argc, char *argv[]) {
       int pid = fork();
       if(pid == 0) {
         int ret = exec(command, para);
-        if (ret == -1)
-          printu("exec failed!\n");
-        else {
-          // printu("======== Command executed successfully ========\n");
-          return 0;
-        }
+        return ret;
       }
       else
       {

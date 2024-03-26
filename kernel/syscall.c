@@ -101,34 +101,34 @@ ssize_t sys_user_exit(uint64 code) {
 //
 // maybe, the simplest implementation of malloc in the world ... added @lab2_2
 //
-uint64 sys_user_allocate_page() {
-  void* pa = alloc_page();
-  uint64 va;
-  // if there are previously reclaimed pages, use them first (this does not change the
-  // size of the heap)
-  if (current->user_heap.free_pages_count > 0) {
-    va =  current->user_heap.free_pages_address[--current->user_heap.free_pages_count];
-    assert(va < current->user_heap.heap_top);
-  } else {
-    // otherwise, allocate a new page (this increases the size of the heap by one page)
-    va = current->user_heap.heap_top;
-    current->user_heap.heap_top += PGSIZE;
+uint64 sys_user_allocate_page(uint64 n) {
+  // void* pa = alloc_page();
+  // uint64 va;
+  // // if there are previously reclaimed pages, use them first (this does not change the
+  // // size of the heap)
+  // if (current->user_heap.free_pages_count > 0) {
+  //   va =  current->user_heap.free_pages_address[--current->user_heap.free_pages_count];
+  //   assert(va < current->user_heap.heap_top);
+  // } else {
+  //   // otherwise, allocate a new page (this increases the size of the heap by one page)
+  //   va = current->user_heap.heap_top;
+  //   current->user_heap.heap_top += PGSIZE;
 
-    current->mapped_info[HEAP_SEGMENT].npages++;
-  }
-  user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
-         prot_to_type(PROT_WRITE | PROT_READ, 1));
-
-  return va;
+  //   current->mapped_info[HEAP_SEGMENT].npages++;
+  // }
+  // user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+  //        prot_to_type(PROT_WRITE | PROT_READ, 1));
+  return malloc((int) n);
 }
 
 //
 // reclaim a page, indicated by "va". added @lab2_2
 //
 uint64 sys_user_free_page(uint64 va) {
-  user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
-  // add the reclaimed page to the free page list
-  current->user_heap.free_pages_address[current->user_heap.free_pages_count++] = va;
+  // user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
+  // // add the reclaimed page to the free page list
+  // current->user_heap.free_pages_address[current->user_heap.free_pages_count++] = va;
+  free((void*)va);
   return 0;
 }
 
@@ -350,7 +350,7 @@ int print_func_name(uint64 ret_addr) {
     }
     return 1;
 }
-//added lab1_c1
+//added lab1_ch1
 ssize_t sys_user_print_backtrace(uint64 n) {
 //  sprint("sp:%lx,s0:%lx", current->trapframe->regs.sp, current->trapframe->regs.s0);
   // sprint("print backtrace:user_s0=%lx,user_sp=%lx\n",current->trapframe->regs.s0,current->trapframe->regs.sp);
@@ -369,19 +369,6 @@ ssize_t sys_user_print_backtrace(uint64 n) {
     return 0;
 }
 
-// added on lab2_c2
-uint64 sys_user_malloc(uint64 size)
-{
-  uint64 va = better_alloc(size);
-  return va;
-}
-
-uint64 sys_user_free(uint64 va)
-{
-  better_free(va);
-  return 0;
-}
-
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
@@ -394,7 +381,7 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_exit(a1);
     // added @lab2_2
     case SYS_user_allocate_page:
-      return sys_user_allocate_page();
+      return sys_user_allocate_page(a1);
     case SYS_user_free_page:
       return sys_user_free_page(a1);
     case SYS_user_fork:
@@ -448,12 +435,6 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_sem_v(a1);
     case SYS_user_print_backtrace:
       return sys_user_print_backtrace(a1);
-    case SYS_user_printpa:
-      return sys_user_printpa(a1);
-    case SYS_user_malloc:
-    return sys_user_malloc(a1);
-  case SYS_user_free:
-    return sys_user_free(a1);
 
     default:
       panic("Unknown syscall %ld \n", a0);

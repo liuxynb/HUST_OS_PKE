@@ -102,11 +102,6 @@ static uint64 elf_fpread(elf_ctx *ctx, void *dest, uint64 nb, uint64 offset) {
   vfs_lseek(msg->f, offset, SEEK_SET);
   return vfs_read(msg->f, dest, nb);
 }
-static uint64 vfs_elf_pread(struct file *elf_file, void *dest, uint64 nb, uint64 offset) {
-  vfs_lseek(elf_file, offset, 0);
-  return vfs_read(elf_file, dest, nb);
-}
-
 //
 // init elf_ctx, a data structure that loads the elf.
 //
@@ -122,15 +117,6 @@ elf_status elf_init(elf_ctx *ctx, void *info) {
   return EL_OK;
 }
 
-elf_status vfs_elf_init(elf_ctx *ctx, struct file *elf_file) {
-  if(vfs_elf_pread(elf_file, &ctx->ehdr, sizeof(ctx->ehdr), 0)!= sizeof(ctx->ehdr)) {
-    return EL_EIO;
-  }
-  if (ctx->ehdr.magic != ELF_MAGIC) {
-    return EL_NOTELF;
-  }
-  return EL_OK;
-}
 
 /*
 * analyzis the data in the debug_line section

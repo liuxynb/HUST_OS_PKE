@@ -7,9 +7,14 @@
 #include "pmm.h"
 #include "util/types.h"
 #include "memlayout.h"
+#include "process.h"
+#include "syscall.h"
 #include "util/string.h"
 #include "spike_interface/spike_utils.h"
 #include "util/functions.h"
+
+
+int init_flag = 0;//mem_control_block链表是否初始化的标志
 
 /* --- utility functions for virtual address mapping --- */
 //
@@ -227,4 +232,101 @@ void print_proc_vmspace(process* proc) {
     }
     sprint( ", mapped to pa:%lx\n", lookup_pa(proc->pagetable, proc->mapped_info[i].va) );
   }
+}
+
+
+/* --- 堆增长 --- */
+uint64 user_heap_grow(pagetable_t pagetable,uint64 old_size,uint64 new_size){
+    // 为虚拟地址[old_size, new_size]分配页面并进行映射
+    if(old_size >= new_size) return old_size; //非法，新的size应该大于旧的size
+    old_size = ROUNDUP(old_size,PGSIZE); //向上对齐
+    for(uint64 i = old_size; i < new_size; i += PGSIZE){ // 为[old_size, new_size]分配页面并进行映射
+        char * mem_new = (char *)alloc_page();
+        if(mem_new == NULL) panic("user_heap_malloc: out of memory");
+        memset(mem_new, 0, PGSIZE);
+        user_vm_map(pagetable, i, PGSIZE, (uint64)mem_new, prot_to_type(PROT_READ | PROT_WRITE,1));
+    }
+    return new_size;
+}
+/* -- 新分配用户堆空间 -- */
+void user_better_malloc(uint64 n){
+    // 在堆中新分配n个字节的内存
+    if(n<0) panic("user_better_malloc: invalid size");
+    uint64 new_size = current->heap_size + n;
+    user_heap_grow(current->pagetable, current->heap_size, new_size);
+    current->heap_size = new_size;
+}
+
+
+/* -- 内存池的初始化 -- */
+void mcb_init(){
+    if(init_flag==0){ //未被初始化
+        current->heap_size = USER_FREE_ADDRESS_START;
+        uint64 start = current->heap_size;
+        user_better_malloc(sizeof(mem_control_block)); //分配第一个内存控制块
+        pte_t *pte = page_walk(current->pagetable, start, 0);//找到第一个内存控制块的pte
+        mem_control_block *first_control_block = (mem_control_block *) PTE2PA(*pte); //找到第一个内存控制块的地址
+        current->mcb_head = (uint64)first_control_block; //记录第一个内存控制块的地址
+        first_control_block->next = first_control_block; //初始化链表
+        first_control_block->size = 0; //size初始为0
+        current->mcb_tail = (uint64)first_control_block; //记录最后一个内存控制块的地址
+        init_flag = 1;
+    }
+}
+
+/*-- 内存分配 --*/
+// 先从内存池（mcb_list)中找到合适的内存块，如果找到了就直接返回，如果没有找到就调用user_better_malloc分配新的内存块
+uint64 malloc(int n){
+    /** Step1:从内存池中查找可分配的空闲空间 **/
+    mcb_init();
+    mem_control_block * head = (mem_control_block *)current->mcb_head;
+    mem_control_block * tail = (mem_control_block *)current->mcb_tail;
+
+//    Debug  内存控制块链表的遍历
+//    mem_control_block  * p = head;
+//    while(1){
+//        sprint("block: offset: %d, size: %d, is_available: %d\n", p->offset, p->size, p->is_available);
+//        if(p->next == tail) break;
+//        p = p->next;
+//    }
+//    sprint("\n");
+    while(1){//从头到尾遍历内存控制块链表，找到第一个可用的内存块
+//        sprint("block: offset: %d, size: %d, is_available: %d\n", head->offset, head->size, head->is_available);
+        if(head->size >= n && head->is_available == 1){
+//            sprint("malloc: find a available memory block, offset: %d, size: %d\n", head->offset, head->size);
+            head->is_available = 0;
+//            sprint("malloc: find a available memory block, offset: %d, size: %d\n", head->offset, head->size);
+            return head->offset + sizeof(mem_control_block);
+        }
+        if(head->next == tail) break;
+        head = head->next;
+    }
+    /** Step2:内存池没有满足要求的空闲，新分配空间 **/
+    uint64 allocate_addr = current->heap_size; //新分配空间首地址
+    user_better_malloc((uint64)(sizeof(mem_control_block) + n + 8)); //分配新的内存块
+    pte_t * pte = page_walk(current->pagetable, allocate_addr, 0); //找到新分配的内存块的pte
+    mem_control_block * new_control_block = (mem_control_block *)(PTE2PA(*pte) + (allocate_addr & 0xfff)); //找到新分配的内存块的地址
+    uint64 align = (8-((uint64)new_control_block % 8))%8; //对齐的offset
+    new_control_block = (mem_control_block *)((uint64)new_control_block + align); //对齐
+    new_control_block->is_available = 0; //设置为不可用
+    new_control_block->offset = allocate_addr; //设置offset
+    new_control_block->size = n; //设置size
+    new_control_block->next = head->next; //插入到链表中
+    head->next = new_control_block;
+    head = (mem_control_block *)current->mcb_head;
+//    current->mcb_tail = (uint64)new_control_block;
+//    sprint("malloc: allocate a new memory block, offset: %d, size: %d\n", new_control_block->offset, new_control_block->size);
+    return allocate_addr + sizeof(mem_control_block);//返回新分配的空间首地址
+}
+void free(void* va){
+
+    va = (void *)((uint64)va - sizeof(mem_control_block));
+    pte_t *pte = page_walk(current->pagetable, (uint64)(va), 0);
+    mem_control_block *cur = (mem_control_block *)(PTE2PA(*pte) + ((uint64)va & 0xfff));
+    uint64 amo = (8 - ((uint64)cur % 8))%8;
+    cur = (mem_control_block *)((uint64)cur + amo);
+    if(cur->is_available == 1)
+        panic("in free function, the memory has been freed before! \n");
+    cur->is_available =1;
+//    sprint("free: free a memory block, offset: %d, size: %d\n", cur->offset, cur->size);
 }

@@ -106,6 +106,11 @@ typedef struct process_t {
   
   // file system. added @lab4_1
   proc_file_management *pfiles;//文件打开表
+
+  //memory management. added @lab2_ch2
+  uint64 heap_size;
+  uint64 mcb_head; // 内存控制块链表头指针的地址pa
+  uint64 mcb_tail; // 内存控制块链表尾指针的地址pa
 }process;
 
 /* -- 信号量的定义 -- */

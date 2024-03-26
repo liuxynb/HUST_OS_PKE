@@ -123,6 +123,12 @@ USER_BT_CPPS 		:= user/app_print_backtrace.c user/user_lib.c
 USER_BT_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_BT_CPPS)))
 
 USER_BT_TARGET 	:= $(HOSTFS_ROOT)/bin/backtrace
+
+USER_HM_CPPS 		:= user/app_singlepageheap.c user/user_lib.c
+
+USER_HM_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_HM_CPPS)))
+
+USER_HM_TARGET 	:= $(HOSTFS_ROOT)/bin/heap
 #------------------------targets------------------------
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	
@@ -139,6 +145,7 @@ $(OBJ_DIR):
 	@-mkdir -p $(dir $(USER_PF_OBJS))
 	@-mkdir -p $(dir $(USER_BT_OBJS))
 	@-mkdir -p $(dir $(USER_SEM_OBJS))
+	@-mkdir -p $(dir $(USER_HM_OBJS))
 
 	
 $(OBJ_DIR)/%.o : %.c
@@ -225,15 +232,21 @@ $(USER_BT_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_BT_OBJS)
 	@$(COMPILE) --entry=main $(USER_BT_OBJS) $(UTIL_LIB) -o $@
 	@echo "User app has been built into" \"$@\"
 
+$(USER_HM_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_HM_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_HM_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+
 -include $(wildcard $(OBJ_DIR)/*/*.d)
 -include $(wildcard $(OBJ_DIR)/*/*/*.d)
 
 .DEFAULT_GOAL := $(all)
 
-all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET)
+all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET}
 .PHONY:all
 
-run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET)
+run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET}
 	@echo "********************HUST PKE********************"
 	spike $(KERNEL_TARGET) /bin/shell
 

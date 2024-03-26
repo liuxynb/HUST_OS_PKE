@@ -9,8 +9,7 @@
 
 int printu(const char *s, ...);
 int exit(int code);
-void* naive_malloc();
-void naive_free(void* va);
+
 int fork();
 void yield();
 
@@ -35,24 +34,22 @@ int unlink_u(const char *fn);
 int exec(char * command,char * para);
 int wait(int pid);
 
-// added @challengeX
+//added @challengeX
 int scanu(const char *s, ...);
 
-// added cd & pwd
+//added cd & pwd
 void pwd(char * path);
 void cd(const char *path);
 
-// added lab3_ch2
+//added lab3_ch2
 int sem_new(int value);
 int sem_P(int sem_id);
 int sem_V(int sem_id);
 
-// added lab1_ch1
+//added lab1_ch1
 int print_backtrace(int n);
-// added @lab3_c3
-void printpa(int *va);
-// added @lab2_c2
-void *better_malloc(int n);
-void better_free(void *va);
 
+//added lab2_ch2
+void * malloc(uint64 size);
+void free(void * ptr);
 #endif

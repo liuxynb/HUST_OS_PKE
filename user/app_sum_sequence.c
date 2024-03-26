@@ -28,7 +28,7 @@ int main(void) {
   // the max limit of the number is 4kB/4 = 1024
 
   // SECOND, we use array out of bound to trigger pagefaults in an invalid address
-  int *ans = (int *)naive_malloc();
+  int *ans = (int *)malloc(4096);
 
   printu("Summation of an arithmetic sequence from 0 to %ld is: %ld \n", n, sum_sequence(n+1, ans) );
 

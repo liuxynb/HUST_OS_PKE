@@ -14,11 +14,6 @@
 // added @lab3_1
 #define SYS_user_fork (SYS_user_base + 4)
 #define SYS_user_yield (SYS_user_base + 5)
-// added @lab3_c3
-#define SYS_user_printpa (SYS_user_base + 6)
-// added @lab2_c2
-#define SYS_user_malloc (SYS_user_base + 7)
-#define SYS_user_free (SYS_user_base + 8)
 // added @lab4_1
 #define SYS_user_open (SYS_user_base + 17)
 #define SYS_user_read (SYS_user_base + 18)
@@ -55,7 +50,6 @@
 
 //added lab1_ch1
 #define SYS_user_print_backtrace (SYS_user_base + 38)
-
 
 ssize_t sys_user_exit(uint64 code);
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long a7);
