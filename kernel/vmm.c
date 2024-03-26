@@ -290,6 +290,8 @@ uint64 user_heap_grow(pagetable_t pagetable, uint64 old_size, uint64 new_size)
       panic("user_heap_malloc: out of memory");
     memset(mem_new, 0, PGSIZE);
     user_vm_map(pagetable, i, PGSIZE, (uint64)mem_new, prot_to_type(PROT_READ | PROT_WRITE, 1));
+    current->heap_size += PGSIZE;
+    current->user_heap.heap_top = new_size;
   }
   return new_size;
 }
@@ -307,7 +309,7 @@ void user_better_malloc(uint64 n)
 /* -- 内存池的初始化 -- */
 void mcb_init()
 {
-  if (init_flag == 0)
+  if (current->ifInit == 0)
   { // 未被初始化
     current->heap_size = USER_FREE_ADDRESS_START;
     uint64 start = current->heap_size;
@@ -318,7 +320,7 @@ void mcb_init()
     first_control_block->next = first_control_block;                            // 初始化链表
     first_control_block->size = 0;                                              // size初始为0
     current->mcb_tail = (uint64)first_control_block;                            // 记录最后一个内存控制块的地址
-    init_flag = 1;
+    current->ifInit= 1;
   }
 }
 

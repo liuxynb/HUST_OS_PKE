@@ -302,6 +302,7 @@ int do_fork(process *parent)
     child->trapframe->regs.a0 = 0;
     child->parent = parent;
     child->pfiles = parent->pfiles;
+    child->n_stack_pages = 1;
     insert_to_ready_queue(child);
     return child->pid;
 }

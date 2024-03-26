@@ -64,9 +64,12 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
   {
   case CAUSE_STORE_PAGE_FAULT:
     // added on lab3_c3
-    if (stval > USER_STACK_TOP - (n_stack_pages + 1) * PGSIZE && stval < USER_STACK_TOP)
+    if(stval > USER_STACK_TOP - (current->n_stack_pages +1) * PGSIZE && stval < USER_STACK_TOP) // stack overflow
     {
-      panic("this address is not available!\n");
+        sprint("stack overflow!\n");
+        sys_user_exit(-1);
+        // panic("this address is not available\n");
+        break;
     }
     pte = page_walk(current->pagetable, stval, 0);
     if (pte == NULL) // 缺页异常
@@ -76,7 +79,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
       if ((void *)pa == NULL)
         panic("Can not allocate a new physical page.\n");
       map_pages(current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, pa, prot_to_type(PROT_READ | PROT_WRITE, 1)); // maps the new page to the virtual address that causes the page fault
-      n_stack_pages++;
+      current->n_stack_pages++;
     }
     else if (*pte & PTE_C)
     {
