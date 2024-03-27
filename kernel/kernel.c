@@ -96,6 +96,7 @@ int s_start(void) {
   // but now, we are going to switch to the paging mode @lab2_1.
   // note, the code still works in Bare mode when calling pmm_init() and kern_vm_init().
   write_csr(satp, 0);
+  // sprint("hartid = %d: init 0\n", hartid);
   if(hartid == 0) // only hart 0 initializes the physical memory manager and kernel page table
   {
     // init phisical memory manager
@@ -114,6 +115,7 @@ int s_start(void) {
   }
   // wait for hart 0 to finish kernel initialization
   // added @lab2_c3, for syncronization
+  sprint("----- hartid = %d: init --------\n", hartid);
   sync_barrier(&syn_sstart, NCPU); 
 
 

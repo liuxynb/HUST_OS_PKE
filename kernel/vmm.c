@@ -144,14 +144,17 @@ void kern_vm_map(pagetable_t page_dir, uint64 va, uint64 pa, uint64 sz, int perm
 //
 void kern_vm_init(void)
 {
+  sprint("kernel text segment is mapped from [0x%lx, 0x%lx] to [0x%lx, 0x%lx]\n",
+         KERN_BASE, (uint64)_etext, DRAM_BASE, DRAM_BASE + ((uint64)_etext - KERN_BASE));
   // pagetable_t is defined in kernel/riscv.h. it's actually uint64*
   pagetable_t t_page_dir;
 
   // allocate a page (t_page_dir) to be the page directory for kernel. alloc_page is defined in kernel/pmm.c
+  // sprint("allocating a page for kernel page directory\n");
   t_page_dir = (pagetable_t)alloc_page();
   // memset is defined in util/string.c
   memset(t_page_dir, 0, PGSIZE);
-
+  
   // map virtual address [KERN_BASE, _etext] to physical address [DRAM_BASE, DRAM_BASE+(_etext - KERN_BASE)],
   // to maintain (direct) text section kernel address mapping.
   kern_vm_map(t_page_dir, KERN_BASE, DRAM_BASE, (uint64)_etext - KERN_BASE,

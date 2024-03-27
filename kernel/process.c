@@ -114,22 +114,18 @@ process *alloc_process()
         panic("cannot find any free process structure.\n");
         return 0;
     }
-
     // init proc[i]'s vm space
     procs[i].trapframe = (trapframe *)alloc_page(); // trapframe, used to save context
     memset(procs[i].trapframe, 0, sizeof(trapframe));
-
+     
     // page directory
     procs[i].pagetable = (pagetable_t)alloc_page();
+
     memset((void *)procs[i].pagetable, 0, PGSIZE);
 
-    procs[i].kstack = (uint64)
-                          alloc_page() +
-                      PGSIZE; // user kernel stack top
-    uint64
-        user_stack = (uint64)
-            alloc_page();                         // phisical address of user stack bottom
-    procs[i].trapframe->regs.sp = USER_STACK_TOP; // virtual address of user stack top
+    procs[i].kstack = (uint64)alloc_page() + PGSIZE; // user kernel stack top
+    uint64 user_stack = (uint64)alloc_page();        // phisical address of user stack bottom
+    procs[i].trapframe->regs.sp = USER_STACK_TOP;    // virtual address of user stack top
 
     // allocates a page to record memory regions (segments)
     procs[i].mapped_info = (mapped_region *)alloc_page();
@@ -144,29 +140,21 @@ process *alloc_process()
 
     // map trapframe in user space (direct mapping as in kernel space).
     user_vm_map((pagetable_t)procs[i].pagetable, (uint64)procs[i].trapframe, PGSIZE,
-                (uint64)
-                    procs[i]
-                        .trapframe,
-                prot_to_type(PROT_WRITE | PROT_READ, 0));
-    procs[i].mapped_info[CONTEXT_SEGMENT].va = (uint64)
-                                                   procs[i]
-                                                       .trapframe;
+                (uint64)procs[i].trapframe, prot_to_type(PROT_WRITE | PROT_READ, 0));
+    procs[i].mapped_info[CONTEXT_SEGMENT].va = (uint64)procs[i].trapframe;
     procs[i].mapped_info[CONTEXT_SEGMENT].npages = 1;
     procs[i].mapped_info[CONTEXT_SEGMENT].seg_type = CONTEXT_SEGMENT;
 
     // map S-mode trap vector section in user space (direct mapping as in kernel space)
     // we assume that the size of usertrap.S is smaller than a page.
     user_vm_map((pagetable_t)procs[i].pagetable, (uint64)trap_sec_start, PGSIZE,
-                (uint64)
-                    trap_sec_start,
-                prot_to_type(PROT_READ | PROT_EXEC, 0));
-    procs[i].mapped_info[SYSTEM_SEGMENT].va = (uint64)
-        trap_sec_start;
+                (uint64)trap_sec_start, prot_to_type(PROT_READ | PROT_EXEC, 0));
+    procs[i].mapped_info[SYSTEM_SEGMENT].va = (uint64)trap_sec_start;
     procs[i].mapped_info[SYSTEM_SEGMENT].npages = 1;
     procs[i].mapped_info[SYSTEM_SEGMENT].seg_type = SYSTEM_SEGMENT;
 
     // sprint("in alloc_proc. user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n",
-    //    procs[i].trapframe, procs[i].trapframe->regs.sp, procs[i].kstack);
+    //   procs[i].trapframe, procs[i].trapframe->regs.sp, procs[i].kstack);
 
     // initialize the process's heap manager
     procs[i].user_heap.heap_top = USER_FREE_ADDRESS_START;
@@ -182,8 +170,6 @@ process *alloc_process()
 
     // initialize files_struct
     procs[i].pfiles = init_proc_file_management();
-    //   sprint("in alloc_proc. build proc_file_management successfully.\n");
-    // return after initialization.
     spin_unlock(&alloc_lock);
     return &procs[i];
 }
@@ -411,7 +397,7 @@ int do_sem_p(int sem_id)
             current[hartid]->queue_next = NULL;
         }
         current[hartid]->status = BLOCKED; // 将当前进程状态设置为阻塞
-        schedule();                // 调度下一个进程
+        schedule();                        // 调度下一个进程
         return 0;
     }
     return 0;
