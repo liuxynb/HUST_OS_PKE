@@ -104,7 +104,7 @@ proc_file_management *init_proc_file_management(void)
   for (int fd = 0; fd < MAX_FILES; ++fd)
     pfiles->opened_files[fd].status = FD_NONE;
 
-  // sprint("FS: created a file management struct for a process.\n");
+  sprint("FS: created a file management struct for a process.\n");
   return pfiles;
 }
 

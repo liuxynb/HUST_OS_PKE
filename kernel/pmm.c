@@ -25,7 +25,7 @@ typedef struct node {
 static list_node g_free_mem_list;
 
 // added @lab2_c3, for isolation of page allocation and free operations
-static int page_lock = 0;
+volatile int page_lock = 1;
 
 //
 // actually creates the freepage list. each page occupies 4KB (PGSIZE), i.e., small page.

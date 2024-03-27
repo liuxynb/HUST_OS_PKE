@@ -70,11 +70,14 @@ process* load_user_program() {
   process* proc;
   //USER_STACK_TOP 
   uint64 tp=read_tp();
+  
   proc = alloc_process();
   proc->trapframe->regs.tp=tp;
   sprint("hartid = %d:User application is loading.\n", tp);
 
   arg_buf arg_bug_msg;
+ 
+ 
   // retrieve command line arguements
   size_t argc = parse_args(&arg_bug_msg);
   if (!argc) panic("You need to specify the application program!\n");
@@ -85,7 +88,7 @@ process* load_user_program() {
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
-volatile int sync_val = 0; // added @lab2_c3, for syncronization
+volatile int syn_sstart = 0; // added @lab2_c3, for syncronization
 int s_start(void) {
   int hartid = read_tp();
   sprint("hartid = %d: Enter supervisor mode...\n", hartid);
@@ -93,32 +96,35 @@ int s_start(void) {
   // but now, we are going to switch to the paging mode @lab2_1.
   // note, the code still works in Bare mode when calling pmm_init() and kern_vm_init().
   write_csr(satp, 0);
-  
   if(hartid == 0) // only hart 0 initializes the physical memory manager and kernel page table
   {
     // init phisical memory manager
     pmm_init();
     // build the kernel page table
     kern_vm_init();
+
+    // now, switch to paging mode by turning on paging (SV39)
+    enable_paging();
+
+    // added @lab3_1
+    init_proc_pool();
+
+    // init file system, added @lab4_1
+    fs_init();
   }
   // wait for hart 0 to finish kernel initialization
   // added @lab2_c3, for syncronization
-  sync_barrier(&sync_val, NCPU); 
+  sync_barrier(&syn_sstart, NCPU); 
 
-  // now, switch to paging mode by turning on paging (SV39)
-  enable_paging();
-  // the code now formally works in paging mode, meaning the page table is now in use.
-  sprint("kernel page table is on \n");
 
   // the application code (elf) is first loaded into memory, and then put into execution
-  load_user_program(&user_app[hartid]);
 
   sprint("hartid = %d: Switch to user mode...\n", hartid);
   
   
+  insert_to_ready_queue( load_user_program() ); 
   vm_alloc_stage[hartid] = 1;
-  // switch_to() is defined in kernel/process.c
-  switch_to(&user_app[hartid]);
+  schedule(0);
 
   // we should never reach here.
   return 0;
