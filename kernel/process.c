@@ -17,7 +17,7 @@
 #include "memlayout.h"
 #include "sched.h"
 #include "spike_interface/spike_utils.h"
-
+#include "sync_utils.h"
 // Two functions defined in kernel/usertrap.S
 extern char smode_trap_vector[];
 
@@ -32,7 +32,7 @@ process procs[NPROC];
 semaphore sem_pool[NPROC];
 
 // current points to the currently running user-mode application.
-process *current = NULL;
+process *current[NCPU] = {NULL};
 
 // points to the first free page in our simple heap. added @lab2_2
 uint64 g_ufree_page = USER_FREE_ADDRESS_START;
@@ -43,8 +43,9 @@ uint64 g_ufree_page = USER_FREE_ADDRESS_START;
 void switch_to(process *proc)
 {
     // sprint("switch_to process %d.\n", proc->pid);
+    int hartid = read_tp();
     assert(proc);
-    current = proc;
+    current[hartid] = proc;
 
     // write the smode_trap_vector (64-bit func. address) defined in kernel/strap_vector.S
     // to the stvec privilege register, such that trap handler pointed by smode_trap_vector
@@ -97,11 +98,13 @@ void init_proc_pool()
 // allocate an empty process, init its vm space. returns the pointer to
 // process strcuture. added @lab3_1
 //
+volatile int alloc_lock = 1;
 process *alloc_process()
 {
+    int hartid = read_tp();
     // locate the first usable process structure
     int i;
-
+    spin_lock(&alloc_lock);
     for (i = 0; i < NPROC; i++)
         if (procs[i].status == FREE)
             break;
@@ -180,8 +183,8 @@ process *alloc_process()
     // initialize files_struct
     procs[i].pfiles = init_proc_file_management();
     //   sprint("in alloc_proc. build proc_file_management successfully.\n");
-
     // return after initialization.
+    spin_unlock(&alloc_lock);
     return &procs[i];
 }
 
@@ -213,6 +216,7 @@ int free_process(process *proc)
 //
 int do_fork(process *parent)
 {
+    int hartid = read_tp();
     // sprint("will fork a child from parent %d.\n", parent->pid);
     process *child = alloc_process();
 
@@ -234,8 +238,8 @@ int do_fork(process *parent)
         case HEAP_SEGMENT:
         {
             // 需要复制父进程的堆空间
-            for (uint64 heap_block = current->user_heap.heap_bottom;
-                 heap_block < current->user_heap.heap_top; heap_block += PGSIZE)
+            for (uint64 heap_block = current[hartid]->user_heap.heap_bottom;
+                 heap_block < current[hartid]->user_heap.heap_top; heap_block += PGSIZE)
             {
                 uint64 parent_pa = lookup_pa(parent->pagetable, heap_block);
                 // 使用写时复制模式映射堆空间
@@ -309,12 +313,13 @@ int do_fork(process *parent)
 
 int do_wait(int pid)
 {
+    int hartid = read_tp();
     int flag = 0; // 标志是否找到子进程
     if (pid == -1)
     { // 父进程任意等待一个子进程
         for (int i = 0; i < NPROC; i++)
         {
-            if (procs[i].parent == current)
+            if (procs[i].parent == current[hartid])
             {
                 flag = 1;
                 if (procs[i].status == ZOMBIE)
@@ -330,15 +335,15 @@ int do_wait(int pid)
         }
         else
         { // 子进程还没有执行完，进入阻塞队列
-            current->status = BLOCKED;
-            insert_to_blocked_queue(current);
+            current[hartid]->status = BLOCKED;
+            insert_to_blocked_queue(current[hartid]);
             schedule();
             return -2;
         }
     }
     else if (pid >= 0 && pid < NPROC)
     { // 等待特定的子进程
-        if (procs[pid].parent != current)
+        if (procs[pid].parent != current[hartid])
             return -1;
         else
         {
@@ -349,8 +354,8 @@ int do_wait(int pid)
             }
             else
             {
-                current->status = BLOCKED;
-                insert_to_blocked_queue(current);
+                current[hartid]->status = BLOCKED;
+                insert_to_blocked_queue(current[hartid]);
                 schedule();
                 return -2;
             }
@@ -382,6 +387,7 @@ int do_sem_new(int value)
 }
 int do_sem_p(int sem_id)
 {
+    int hartid = read_tp();
     if (sem_id < 0 || sem_id >= NPROC)
     {
         panic("sem_id is illegal");
@@ -394,17 +400,17 @@ int do_sem_p(int sem_id)
         // 将当前进程加入等待队列
         if (sem_pool[sem_id].waiting_queue_head == NULL)
         {
-            sem_pool[sem_id].waiting_queue_head = current;
-            sem_pool[sem_id].waiting_queue_tail = current;
-            current->queue_next = NULL;
+            sem_pool[sem_id].waiting_queue_head = current[hartid];
+            sem_pool[sem_id].waiting_queue_tail = current[hartid];
+            current[hartid]->queue_next = NULL;
         }
         else
         {
-            sem_pool[sem_id].waiting_queue_tail->queue_next = current;
-            sem_pool[sem_id].waiting_queue_tail = current;
-            current->queue_next = NULL;
+            sem_pool[sem_id].waiting_queue_tail->queue_next = current[hartid];
+            sem_pool[sem_id].waiting_queue_tail = current[hartid];
+            current[hartid]->queue_next = NULL;
         }
-        current->status = BLOCKED; // 将当前进程状态设置为阻塞
+        current[hartid]->status = BLOCKED; // 将当前进程状态设置为阻塞
         schedule();                // 调度下一个进程
         return 0;
     }
@@ -508,22 +514,23 @@ void init_process(process *p)
 // exec会根据读入的可执行文件将'原进程'的数据段、代码段和堆栈段替换。
 int do_exec(char *path, char *para)
 {
-    init_process(current);
+    int hartid = read_tp();
+    init_process(current[hartid]);
     // sprint("user_s0_1 = %lx user_sp = %lx\n", current->trapframe->regs.s0, current->trapframe->regs.sp);
-    load_bincode_from_host_elf(current, path);
+    load_bincode_from_host_elf(current[hartid], path);
     // sprint("user_s0_2 = %lx user_sp = %lx\n", current->trapframe->regs.s0, current->trapframe->regs.sp);
     // push into stack
-    size_t *vsp = (size_t *)current->trapframe->regs.sp;
+    size_t *vsp = (size_t *)current[hartid]->trapframe->regs.sp;
     vsp -= 8;
-    size_t *sp = (size_t *)user_va_to_pa(current->pagetable, (void *)vsp);
+    size_t *sp = (size_t *)user_va_to_pa(current[hartid]->pagetable, (void *)vsp);
     memcpy((char *)sp, para, 1 + strlen(para));
     vsp--, sp--;
     *sp = (size_t)(1 + vsp);
 
     // reg
-    current->trapframe->regs.sp = (uint64)vsp;
-    current->trapframe->regs.a0 = (uint64)1;
-    current->trapframe->regs.a1 = (uint64)vsp;
-    //   sprint("user_s0_3 = %lx user_sp = %lx\n", current->trapframe->regs.s0, current->trapframe->regs.sp);
+    current[hartid]->trapframe->regs.sp = (uint64)vsp;
+    current[hartid]->trapframe->regs.a0 = (uint64)1;
+    current[hartid]->trapframe->regs.a1 = (uint64)vsp;
+    //   sprint("user_s0_3 = %lx user_sp = %lx\n", current[hartid]->trapframe->regs.s0, current[hartid]->trapframe->regs.sp);
     return 0;
 }

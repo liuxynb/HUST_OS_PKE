@@ -5,6 +5,7 @@
 #include "util/string.h"
 #include "memlayout.h"
 #include "spike_interface/spike_utils.h"
+#include "sync_utils.h" // added @lab2_c3, for syncronization
 
 // _end is defined in kernel/kernel.lds, it marks the ending (virtual) address of PKE kernel
 extern char _end[];
@@ -15,12 +16,16 @@ extern uint64 g_mem_size;
 static uint64 free_mem_start_addr;  //beginning address of free memory
 static uint64 free_mem_end_addr;    //end address of free memory (not included)
 
+int vm_alloc_stage[NCPU] = { 0 }; // 0 for kernel alloc, 1 for user alloc
 typedef struct node {
   struct node *next;
 } list_node;
 
 // g_free_mem_list is the head of the list of free physical memory pages
 static list_node g_free_mem_list;
+
+// added @lab2_c3, for isolation of page allocation and free operations
+static int page_lock = 0;
 
 //
 // actually creates the freepage list. each page occupies 4KB (PGSIZE), i.e., small page.
@@ -36,6 +41,7 @@ static void create_freepage_list(uint64 start, uint64 end) {
 // place a physical page at *pa to the free list of g_free_mem_list (to reclaim the page)
 //
 void free_page(void *pa) {
+  spin_lock(&page_lock);
   if (((uint64)pa % PGSIZE) != 0 || (uint64)pa < free_mem_start_addr || (uint64)pa >= free_mem_end_addr)
     panic("free_page 0x%lx \n", pa);
 
@@ -43,6 +49,7 @@ void free_page(void *pa) {
   list_node *n = (list_node *)pa;
   n->next = g_free_mem_list.next;
   g_free_mem_list.next = n;
+  spin_unlock(&page_lock);
 }
 
 //
@@ -50,9 +57,14 @@ void free_page(void *pa) {
 // Allocates only ONE page!
 //
 void *alloc_page(void) {
+  spin_lock(&page_lock);
   list_node *n = g_free_mem_list.next;
+  uint64 hartid = read_tp();
+  if (vm_alloc_stage[hartid]) {
+    sprint("hartid = %ld: alloc page 0x%x\n", hartid, n);
+  }
   if (n) g_free_mem_list.next = n->next;
-
+  spin_unlock(&page_lock);
   return (void *)n;
 }
 

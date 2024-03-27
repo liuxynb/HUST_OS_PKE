@@ -64,6 +64,7 @@ void insert_to_blocked_queue( process* proc ){
 //
 extern process procs[NPROC];
 void schedule() {
+  int hartid = read_tp();
   if ( !ready_queue_head ){
     // by default, if there are no ready process, and all processes are in the status of
     // FREE and ZOMBIE, we should shutdown the emulated RISC-V machine.
@@ -85,19 +86,19 @@ void schedule() {
     }
   }
 
-  current = ready_queue_head;
-  assert( current->status == READY );
+  current[hartid] = ready_queue_head;
+  assert( current[hartid]->status == READY );
   ready_queue_head = ready_queue_head->queue_next;
 
-  current->status = RUNNING;
-  sprint( "going to schedule process %d to run.\n", current->pid );
+  current[hartid]->status = RUNNING;
+  sprint( "going to schedule process %d to run.\n", current[hartid]->pid );
   // sprint("info of current process: pid=%d, status=%d\n kstack=%lx,tick_count=%d\n",current->pid,current->status,current->kstack,current->tick_count);
   // for(int i=0;i<current->total_mapped_region;i++){
   //   // sprint("mapped_info[%d]:va:%ld,npages:%d,seg_type:%d ",i,current->mapped_info[i].va,current->mapped_info[i].npages,current->mapped_info[i].seg_type);
   //   uint64 pa  = lookup_pa(current->pagetable,current->mapped_info[i].va);
   //   sprint("pa:%lx\n",pa);
   // }
-  switch_to( current );
+  switch_to( current[hartid] );
 }
 
 void awake_father_process( process* child ){

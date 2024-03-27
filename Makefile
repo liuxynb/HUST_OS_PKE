@@ -104,7 +104,7 @@ USER_EL_CPPS 		:= user/app_errorline.c user/user_lib.c
 
 USER_EL_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_EL_CPPS)))
 
-USER_EL_TARGET 	:= $(HOSTFS_ROOT)/bin/error_line
+USER_EL_TARGET 	:= $(HOSTFS_ROOT)/bin/errorline
 
 USER_SEM_CPPS 		:= user/app_semaphore.c user/user_lib.c
 
@@ -116,7 +116,7 @@ USER_PF_CPPS 		:= user/app_sum_sequence.c user/user_lib.c
 
 USER_PF_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_PF_CPPS)))
 
-USER_PF_TARGET 	:= $(HOSTFS_ROOT)/bin/page_fault
+USER_PF_TARGET 	:= $(HOSTFS_ROOT)/bin/pagefault
 
 USER_BT_CPPS 		:= user/app_print_backtrace.c user/user_lib.c
 
@@ -135,6 +135,18 @@ USER_CW_CPPS 		:= user/app_cow.c user/user_lib.c
 USER_CW_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CW_CPPS)))
 
 USER_CW_TARGET 	:= $(HOSTFS_ROOT)/bin/cow
+
+USER_P_CPPS 		:= user/app0.c user/user_lib.c
+
+USER_P_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_P_CPPS)))
+
+USER_P_TARGET 	:= $(HOSTFS_ROOT)/bin/app0
+
+USER_N_CPPS 		:= user/app1.c user/user_lib.c
+
+USER_N_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_N_CPPS)))
+
+USER_N_TARGET 	:= $(HOSTFS_ROOT)/bin/app1
 #------------------------targets------------------------
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	
@@ -153,6 +165,8 @@ $(OBJ_DIR):
 	@-mkdir -p $(dir $(USER_SEM_OBJS))
 	@-mkdir -p $(dir $(USER_HM_OBJS))
 	@-mkdir -p $(dir $(USER_CW_OBJS))
+	@-mkdir -p $(dir $(USER_P_OBJS))
+	@-mkdir -p $(dir $(USER_N_OBJS))
 
 	
 $(OBJ_DIR)/%.o : %.c
@@ -251,15 +265,27 @@ $(USER_CW_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_CW_OBJS)
 	@$(COMPILE) --entry=main $(USER_CW_OBJS) $(UTIL_LIB) -o $@
 	@echo "User app has been built into" \"$@\"
 
+$(USER_N_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_N_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_N_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+
+$(USER_P_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_P_OBJS)
+	@echo "linking" $@	...	
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_P_OBJS) $(UTIL_LIB) -o $@
+	@echo "User app has been built into" \"$@\"
+
 -include $(wildcard $(OBJ_DIR)/*/*.d)
 -include $(wildcard $(OBJ_DIR)/*/*/*.d)
 
 .DEFAULT_GOAL := $(all)
 
-all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET} ${USER_CW_TARGET}
+all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET} ${USER_CW_TARGET} $(USER_N_TARGET) $(USER_P_TARGET)
 .PHONY:all
 
-run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET} ${USER_CW_TARGET}
+run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET} ${USER_CW_TARGET} $(USER_N_TARGET) $(USER_P_TARGET)
 	@echo "********************HUST PKE********************"
 	spike $(KERNEL_TARGET) /bin/shell
 

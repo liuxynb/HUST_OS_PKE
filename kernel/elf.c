@@ -418,9 +418,8 @@ void load_sym_tab(elf_ctx * elf_ctx){
 // load the elf of user application, by using the spike file interface.
 //
 void load_bincode_from_host_elf(process *p,char* filename) {
-
-
-  sprint("Application: %s\n", filename);
+  uint64 tp=read_tp();
+  sprint("hartid = %d:Application: %s\n", tp,filename);
 
   //elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading process.
   elf_ctx elfloader;
@@ -449,6 +448,6 @@ void load_bincode_from_host_elf(process *p,char* filename) {
   p->n_stack_pages = 1;
   p->ifInit = 0;
 
-  sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
+  sprint("hartid = %d:Application program entry point (virtual address): 0x%lx\n",tp,p->trapframe->epc);
 }
 

@@ -150,7 +150,7 @@ int do_sem_v(int sem_id);
 int do_sem_free(int sem_id);
 
 // current running process
-extern process* current;
+extern process* current[NCPU];
 extern semaphore sem_pool[NPROC];
 // address of the first free page in our simple heap. added @lab2_2
 extern uint64 g_ufree_page;

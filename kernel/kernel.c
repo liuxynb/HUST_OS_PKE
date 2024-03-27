@@ -15,7 +15,10 @@
 #include "vfs.h"
 #include "rfs.h"
 #include "ramdev.h"
+#include "sync_utils.h" // added @lab2_c3, for syncronization
 
+// process is a structure defined in kernel/process.h
+process user_app[NCPU];
 //
 // trap_sec_start points to the beginning of S-mode trap segment (i.e., the entry point of
 // S-mode trap vector). added @lab2_1
@@ -64,55 +67,58 @@ static size_t parse_args(arg_buf *arg_bug_msg) {
 // load_bincode_from_host_elf is defined in elf.c
 //
 process* load_user_program() {
-
   process* proc;
-  proc = alloc_process();//分配一个进程
-  sprint("User application is loading.\n");
+  //USER_STACK_TOP 
+  uint64 tp=read_tp();
+  proc = alloc_process();
+  proc->trapframe->regs.tp=tp;
+  sprint("hartid = %d:User application is loading.\n", tp);
 
   arg_buf arg_bug_msg;
-
   // retrieve command line arguements
   size_t argc = parse_args(&arg_bug_msg);
   if (!argc) panic("You need to specify the application program!\n");
-
-  load_bincode_from_host_elf(proc, arg_bug_msg.argv[0]);
+  load_bincode_from_host_elf(proc, arg_bug_msg.argv[tp]);
   return proc;
 }
 
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
+volatile int sync_val = 0; // added @lab2_c3, for syncronization
 int s_start(void) {
-
-    //S态初始化，返回到U态
-  sprint("Enter supervisor mode...\n");
+  int hartid = read_tp();
+  sprint("hartid = %d: Enter supervisor mode...\n", hartid);
   // in the beginning, we use Bare mode (direct) memory mapping as in lab1.
   // but now, we are going to switch to the paging mode @lab2_1.
   // note, the code still works in Bare mode when calling pmm_init() and kern_vm_init().
   write_csr(satp, 0);
-
-  // init phisical memory manager
-  pmm_init();
-
-  // build the kernel page table
-  kern_vm_init();
+  
+  if(hartid == 0) // only hart 0 initializes the physical memory manager and kernel page table
+  {
+    // init phisical memory manager
+    pmm_init();
+    // build the kernel page table
+    kern_vm_init();
+  }
+  // wait for hart 0 to finish kernel initialization
+  // added @lab2_c3, for syncronization
+  sync_barrier(&sync_val, NCPU); 
 
   // now, switch to paging mode by turning on paging (SV39)
   enable_paging();
   // the code now formally works in paging mode, meaning the page table is now in use.
   sprint("kernel page table is on \n");
 
-  // added @lab3_1
-  init_proc_pool();
-
-  // init file system, added @lab4_1
-  fs_init();
-
-  sprint("Switch to user mode...\n");
   // the application code (elf) is first loaded into memory, and then put into execution
-  // added @lab3_1
-  insert_to_ready_queue( load_user_program() );
-  schedule();
+  load_user_program(&user_app[hartid]);
+
+  sprint("hartid = %d: Switch to user mode...\n", hartid);
+  
+  
+  vm_alloc_stage[hartid] = 1;
+  // switch_to() is defined in kernel/process.c
+  switch_to(&user_app[hartid]);
 
   // we should never reach here.
   return 0;

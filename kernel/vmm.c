@@ -279,6 +279,7 @@ void print_proc_vmspace(process *proc)
 /* --- 堆增长 --- */
 uint64 user_heap_grow(pagetable_t pagetable, uint64 old_size, uint64 new_size)
 {
+  int hartid = read_tp();
   // 为虚拟地址[old_size, new_size]分配页面并进行映射
   if (old_size >= new_size)
     return old_size;                    // 非法，新的size应该大于旧的size
@@ -290,37 +291,39 @@ uint64 user_heap_grow(pagetable_t pagetable, uint64 old_size, uint64 new_size)
       panic("user_heap_malloc: out of memory");
     memset(mem_new, 0, PGSIZE);
     user_vm_map(pagetable, i, PGSIZE, (uint64)mem_new, prot_to_type(PROT_READ | PROT_WRITE, 1));
-    current->heap_size += PGSIZE;
-    current->user_heap.heap_top = new_size;
+    current[hartid]->heap_size += PGSIZE;
+    current[hartid]->user_heap.heap_top = new_size;
   }
   return new_size;
 }
 /* -- 新分配用户堆空间 -- */
 void user_better_malloc(uint64 n)
 {
+  int hartid = read_tp();
   // 在堆中新分配n个字节的内存
   if (n < 0)
     panic("user_better_malloc: invalid size");
-  uint64 new_size = current->heap_size + n;
-  user_heap_grow(current->pagetable, current->heap_size, new_size);
-  current->heap_size = new_size;
+  uint64 new_size = current[hartid]->heap_size + n;
+  user_heap_grow(current[hartid]->pagetable, current[hartid]->heap_size, new_size);
+  current[hartid]->heap_size = new_size;
 }
 
 /* -- 内存池的初始化 -- */
 void mcb_init()
 {
-  if (current->ifInit == 0)
+  int hartid = read_tp();
+  if (current[hartid]->ifInit == 0)
   { // 未被初始化
-    current->heap_size = USER_FREE_ADDRESS_START;
-    uint64 start = current->heap_size;
+    current[hartid]->heap_size = USER_FREE_ADDRESS_START;
+    uint64 start = current[hartid]->heap_size;
     user_better_malloc(sizeof(mem_control_block));                              // 分配第一个内存控制块
-    pte_t *pte = page_walk(current->pagetable, start, 0);                       // 找到第一个内存控制块的pte
+    pte_t *pte = page_walk(current[hartid]->pagetable, start, 0);                       // 找到第一个内存控制块的pte
     mem_control_block *first_control_block = (mem_control_block *)PTE2PA(*pte); // 找到第一个内存控制块的地址
-    current->mcb_head = (uint64)first_control_block;                            // 记录第一个内存控制块的地址
+    current[hartid]->mcb_head = (uint64)first_control_block;                            // 记录第一个内存控制块的地址
     first_control_block->next = first_control_block;                            // 初始化链表
     first_control_block->size = 0;                                              // size初始为0
-    current->mcb_tail = (uint64)first_control_block;                            // 记录最后一个内存控制块的地址
-    current->ifInit= 1;
+    current[hartid]->mcb_tail = (uint64)first_control_block;                            // 记录最后一个内存控制块的地址
+    current[hartid]->ifInit= 1;
   }
 }
 
@@ -328,10 +331,11 @@ void mcb_init()
 // 先从内存池（mcb_list)中找到合适的内存块，如果找到了就直接返回，如果没有找到就调用user_better_malloc分配新的内存块
 uint64 malloc(int n)
 {
+  int hartid = read_tp();
   /** Step1:从内存池中查找可分配的空闲空间 **/
   mcb_init();
-  mem_control_block *head = (mem_control_block *)current->mcb_head;
-  mem_control_block *tail = (mem_control_block *)current->mcb_tail;
+  mem_control_block *head = (mem_control_block *)current[hartid]->mcb_head;
+  mem_control_block *tail = (mem_control_block *)current[hartid]->mcb_tail;
   while (1)
   { // 从头到尾遍历内存控制块链表，找到第一个可用的内存块
     //        sprint("block: offset: %d, size: %d, is_available: %d\n", head->offset, head->size, head->is_available);
@@ -347,9 +351,9 @@ uint64 malloc(int n)
     head = head->next;
   }
   /** Step2:内存池没有满足要求的空闲，新分配空间 **/
-  uint64 allocate_addr = current->heap_size;                                                            // 新分配空间首地址
+  uint64 allocate_addr = current[hartid]->heap_size;                                                            // 新分配空间首地址
   user_better_malloc((uint64)(sizeof(mem_control_block) + n + 8));                                      // 分配新的内存块
-  pte_t *pte = page_walk(current->pagetable, allocate_addr, 0);                                         // 找到新分配的内存块的pte
+  pte_t *pte = page_walk(current[hartid]->pagetable, allocate_addr, 0);                                         // 找到新分配的内存块的pte
   mem_control_block *new_control_block = (mem_control_block *)(PTE2PA(*pte) + (allocate_addr & 0xfff)); // 找到新分配的内存块的地址
   uint64 align = (8 - ((uint64)new_control_block % 8)) % 8;                                             // 对齐的offset
   new_control_block = (mem_control_block *)((uint64)new_control_block + align);                         // 对齐
@@ -358,16 +362,16 @@ uint64 malloc(int n)
   new_control_block->size = n;                                                                          // 设置size
   new_control_block->next = head->next;                                                                 // 插入到链表中
   head->next = new_control_block;
-  head = (mem_control_block *)current->mcb_head;
+  head = (mem_control_block *)current[hartid]->mcb_head;
   //    current->mcb_tail = (uint64)new_control_block;
   //    sprint("malloc: allocate a new memory block, offset: %d, size: %d\n", new_control_block->offset, new_control_block->size);
   return allocate_addr + sizeof(mem_control_block); // 返回新分配的空间首地址
 }
 void free(void *va)
 {
-
+  int hartid = read_tp();
   va = (void *)((uint64)va - sizeof(mem_control_block));
-  pte_t *pte = page_walk(current->pagetable, (uint64)(va), 0);
+  pte_t *pte = page_walk(current[hartid]->pagetable, (uint64)(va), 0);
   mem_control_block *cur = (mem_control_block *)(PTE2PA(*pte) + ((uint64)va & 0xfff));
   uint64 amo = (8 - ((uint64)cur % 8)) % 8;
   cur = (mem_control_block *)((uint64)cur + amo);
