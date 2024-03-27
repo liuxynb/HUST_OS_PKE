@@ -13,8 +13,6 @@
 #include "spike_interface/spike_utils.h"
 #include "util/functions.h"
 
-int init_flag = 0; // mem_control_block链表是否初始化的标志
-
 /* --- utility functions for virtual address mapping --- */
 //
 // establish mapping of virtual address [va, va+size] to phyiscal address [pa, pa+size]
@@ -24,14 +22,15 @@ int map_pages(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm)
 {
   uint64 first, last;
   pte_t *pte;
-
+  uint64 hartid = read_tp();
   for (first = ROUNDDOWN(va, PGSIZE), last = ROUNDDOWN(va + size - 1, PGSIZE);
        first <= last; first += PGSIZE, pa += PGSIZE)
   {
     if ((pte = page_walk(page_dir, first, 1)) == 0)
       return -1;
+
     if (*pte & PTE_V)
-      panic("map_pages fails on mapping va (0x%lx) to pa (0x%lx)", first, pa);
+      panic("hartid = %d : map_pages fails on mapping va (0x%lx) to pa (0x%lx)", hartid, first, pa);
     *pte = PA2PTE(pa) | perm | PTE_V;
   }
   return 0;
@@ -73,8 +72,8 @@ pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc)
   // page medium dir, and page table.
   for (int level = 2; level > 0; level--)
   {
-    // macro "PX" gets the PTE index in page table of current level
-    // "pte" points to the entry of current level
+    // macro "PX" gets the PTE index in page table of current[read_tp()] level
+    // "pte" points to the entry of current[read_tp()] level
     pte_t *pte = pt + PX(level, va);
 
     // now, we need to know if above pte is valid (established mapping to a phyiscal page)
@@ -144,23 +143,20 @@ void kern_vm_map(pagetable_t page_dir, uint64 va, uint64 pa, uint64 sz, int perm
 //
 void kern_vm_init(void)
 {
-  sprint("kernel text segment is mapped from [0x%lx, 0x%lx] to [0x%lx, 0x%lx]\n",
-         KERN_BASE, (uint64)_etext, DRAM_BASE, DRAM_BASE + ((uint64)_etext - KERN_BASE));
   // pagetable_t is defined in kernel/riscv.h. it's actually uint64*
   pagetable_t t_page_dir;
 
   // allocate a page (t_page_dir) to be the page directory for kernel. alloc_page is defined in kernel/pmm.c
-  // sprint("allocating a page for kernel page directory\n");
   t_page_dir = (pagetable_t)alloc_page();
   // memset is defined in util/string.c
   memset(t_page_dir, 0, PGSIZE);
-  
+
   // map virtual address [KERN_BASE, _etext] to physical address [DRAM_BASE, DRAM_BASE+(_etext - KERN_BASE)],
   // to maintain (direct) text section kernel address mapping.
   kern_vm_map(t_page_dir, KERN_BASE, DRAM_BASE, (uint64)_etext - KERN_BASE,
               prot_to_type(PROT_READ | PROT_EXEC, 0));
 
-  sprint("KERN_BASE 0x%lx\n", lookup_pa(t_page_dir, KERN_BASE));
+  // sprint("KERN_BASE 0x%lx\n", lookup_pa(t_page_dir, KERN_BASE));
 
   // also (direct) map remaining address space, to make them accessable from kernel.
   // this is important when kernel needs to access the memory content of user's app
@@ -168,7 +164,7 @@ void kern_vm_init(void)
   kern_vm_map(t_page_dir, (uint64)_etext, (uint64)_etext, PHYS_TOP - (uint64)_etext,
               prot_to_type(PROT_READ | PROT_WRITE, 0));
 
-  sprint("physical address of _etext is: 0x%lx\n", lookup_pa(t_page_dir, (uint64)_etext));
+  // sprint("physical address of _etext is: 0x%lx\n", lookup_pa(t_page_dir, (uint64)_etext));
 
   g_kernel_pagetable = t_page_dir;
 }
@@ -282,8 +278,8 @@ void print_proc_vmspace(process *proc)
 /* --- 堆增长 --- */
 uint64 user_heap_grow(pagetable_t pagetable, uint64 old_size, uint64 new_size)
 {
-  int hartid = read_tp();
   // 为虚拟地址[old_size, new_size]分配页面并进行映射
+  // sprint("pid: %d, old_size: %d, new_size: %d\n", current[read_tp()]->pid, old_size, new_size);
   if (old_size >= new_size)
     return old_size;                    // 非法，新的size应该大于旧的size
   old_size = ROUNDUP(old_size, PGSIZE); // 向上对齐
@@ -294,39 +290,37 @@ uint64 user_heap_grow(pagetable_t pagetable, uint64 old_size, uint64 new_size)
       panic("user_heap_malloc: out of memory");
     memset(mem_new, 0, PGSIZE);
     user_vm_map(pagetable, i, PGSIZE, (uint64)mem_new, prot_to_type(PROT_READ | PROT_WRITE, 1));
-    current[hartid]->heap_size += PGSIZE;
-    current[hartid]->user_heap.heap_top = new_size;
+    current[read_tp()]->heap_size += PGSIZE;
+    current[read_tp()]->user_heap.heap_top = new_size;
   }
   return new_size;
 }
 /* -- 新分配用户堆空间 -- */
 void user_better_malloc(uint64 n)
 {
-  int hartid = read_tp();
   // 在堆中新分配n个字节的内存
   if (n < 0)
     panic("user_better_malloc: invalid size");
-  uint64 new_size = current[hartid]->heap_size + n;
-  user_heap_grow(current[hartid]->pagetable, current[hartid]->heap_size, new_size);
-  current[hartid]->heap_size = new_size;
+  uint64 new_size = current[read_tp()]->heap_size + n;
+  user_heap_grow(current[read_tp()]->pagetable, current[read_tp()]->heap_size, new_size);
+  current[read_tp()]->heap_size = new_size;
 }
 
 /* -- 内存池的初始化 -- */
 void mcb_init()
 {
-  int hartid = read_tp();
-  if (current[hartid]->ifInit == 0)
+  if (current[read_tp()]->init_flag == 0)
   { // 未被初始化
-    current[hartid]->heap_size = USER_FREE_ADDRESS_START;
-    uint64 start = current[hartid]->heap_size;
+    current[read_tp()]->heap_size = USER_FREE_ADDRESS_START;
+    uint64 start = current[read_tp()]->heap_size;
     user_better_malloc(sizeof(mem_control_block));                              // 分配第一个内存控制块
-    pte_t *pte = page_walk(current[hartid]->pagetable, start, 0);                       // 找到第一个内存控制块的pte
+    pte_t *pte = page_walk(current[read_tp()]->pagetable, start, 0);            // 找到第一个内存控制块的pte
     mem_control_block *first_control_block = (mem_control_block *)PTE2PA(*pte); // 找到第一个内存控制块的地址
-    current[hartid]->mcb_head = (uint64)first_control_block;                            // 记录第一个内存控制块的地址
+    current[read_tp()]->mcb_head = (uint64)first_control_block;                 // 记录第一个内存控制块的地址
     first_control_block->next = first_control_block;                            // 初始化链表
     first_control_block->size = 0;                                              // size初始为0
-    current[hartid]->mcb_tail = (uint64)first_control_block;                            // 记录最后一个内存控制块的地址
-    current[hartid]->ifInit= 1;
+    current[read_tp()]->mcb_tail = (uint64)first_control_block;                 // 记录最后一个内存控制块的地址
+    current[read_tp()]->init_flag = 1;
   }
 }
 
@@ -334,11 +328,10 @@ void mcb_init()
 // 先从内存池（mcb_list)中找到合适的内存块，如果找到了就直接返回，如果没有找到就调用user_better_malloc分配新的内存块
 uint64 malloc(int n)
 {
-  int hartid = read_tp();
   /** Step1:从内存池中查找可分配的空闲空间 **/
   mcb_init();
-  mem_control_block *head = (mem_control_block *)current[hartid]->mcb_head;
-  mem_control_block *tail = (mem_control_block *)current[hartid]->mcb_tail;
+  mem_control_block *head = (mem_control_block *)current[read_tp()]->mcb_head;
+  mem_control_block *tail = (mem_control_block *)current[read_tp()]->mcb_tail;
   while (1)
   { // 从头到尾遍历内存控制块链表，找到第一个可用的内存块
     //        sprint("block: offset: %d, size: %d, is_available: %d\n", head->offset, head->size, head->is_available);
@@ -354,9 +347,9 @@ uint64 malloc(int n)
     head = head->next;
   }
   /** Step2:内存池没有满足要求的空闲，新分配空间 **/
-  uint64 allocate_addr = current[hartid]->heap_size;                                                            // 新分配空间首地址
+  uint64 allocate_addr = current[read_tp()]->heap_size;                                                 // 新分配空间首地址
   user_better_malloc((uint64)(sizeof(mem_control_block) + n + 8));                                      // 分配新的内存块
-  pte_t *pte = page_walk(current[hartid]->pagetable, allocate_addr, 0);                                         // 找到新分配的内存块的pte
+  pte_t *pte = page_walk(current[read_tp()]->pagetable, allocate_addr, 0);                              // 找到新分配的内存块的pte
   mem_control_block *new_control_block = (mem_control_block *)(PTE2PA(*pte) + (allocate_addr & 0xfff)); // 找到新分配的内存块的地址
   uint64 align = (8 - ((uint64)new_control_block % 8)) % 8;                                             // 对齐的offset
   new_control_block = (mem_control_block *)((uint64)new_control_block + align);                         // 对齐
@@ -365,16 +358,17 @@ uint64 malloc(int n)
   new_control_block->size = n;                                                                          // 设置size
   new_control_block->next = head->next;                                                                 // 插入到链表中
   head->next = new_control_block;
-  head = (mem_control_block *)current[hartid]->mcb_head;
-  //    current->mcb_tail = (uint64)new_control_block;
+  head = (mem_control_block *)current[read_tp()]->mcb_head;
+  //    current[read_tp()]->mcb_tail = (uint64)new_control_block;
   //    sprint("malloc: allocate a new memory block, offset: %d, size: %d\n", new_control_block->offset, new_control_block->size);
+  // sprint("malloc: allocate a new memory block, offset: %lx, size: %d\n", new_control_block->offset, new_control_block->size);
   return allocate_addr + sizeof(mem_control_block); // 返回新分配的空间首地址
 }
 void free(void *va)
 {
-  int hartid = read_tp();
+
   va = (void *)((uint64)va - sizeof(mem_control_block));
-  pte_t *pte = page_walk(current[hartid]->pagetable, (uint64)(va), 0);
+  pte_t *pte = page_walk(current[read_tp()]->pagetable, (uint64)(va), 0);
   mem_control_block *cur = (mem_control_block *)(PTE2PA(*pte) + ((uint64)va & 0xfff));
   uint64 amo = (8 - ((uint64)cur % 8)) % 8;
   cur = (mem_control_block *)((uint64)cur + amo);
@@ -382,40 +376,4 @@ void free(void *va)
     panic("in free function, the memory has been freed before! \n");
   cur->is_available = 1;
   //    sprint("free: free a memory block, offset: %d, size: %d\n", cur->offset, cur->size);
-}
-
-//
-// added on lab3_c3
-//
-void heap_copy_on_write(process *child, process *parent, uint64 pa)
-{
-  // 需要复制父进程的堆空间
-  for (uint64 heap_block = parent->user_heap.heap_bottom;
-       heap_block < parent->user_heap.heap_top; heap_block += PGSIZE)
-  {
-    uint64 heap_block_pa = lookup_pa(parent->pagetable, heap_block);
-    if (heap_block_pa == 0)
-    {
-      panic("error when looking up heap block pa!");
-    }
-    if (heap_block_pa >= pa && heap_block_pa < pa + PGSIZE)
-    {
-      user_vm_unmap(child->pagetable, heap_block, PGSIZE, 0); // 取消映射
-      void *pa = alloc_page();
-      if ((void *)pa == NULL)
-        panic("Can not allocate a new physical page.\n");
-      pte_t *child_pte = page_walk(child->pagetable, heap_block, 0);
-      if (child_pte == NULL)
-      {
-        panic("error when mapping heap segment!");
-      }
-      *child_pte |= (~PTE_C);      // 设置写时复制标志，为已复制
-      *child_pte &= PTE_W | PTE_R; // 设置读写权限
-      user_vm_map(child->pagetable, heap_block, PGSIZE, (uint64)pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
-      // sprint("do_fork map heap segment at pa:%lx of parent to child at va:%lx.\n", pa, heap_block);
-      memcpy(pa, (void *)lookup_pa(parent->pagetable, heap_block), PGSIZE);
-      // sprint("heap block pa:%lx is already copied to child.\n", heap_block_pa);
-      break;
-    }
-  }
 }

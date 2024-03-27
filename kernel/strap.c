@@ -54,7 +54,6 @@ void handle_mtimer_trap()
 // sepc: the pc when fault happens;
 // stval: the virtual address that causes pagefault when being accessed.
 //
-
 void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
 {
   int hartid = read_tp();
@@ -65,15 +64,15 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
   {
   case CAUSE_STORE_PAGE_FAULT:
     // added on lab3_c3
-    if(stval > USER_STACK_TOP - (current[hartid]->n_stack_pages +1) * PGSIZE && stval < USER_STACK_TOP) // stack overflow
+    if (stval > USER_STACK_TOP - (current[hartid]->n_stack_pages + 1) * PGSIZE && stval < USER_STACK_TOP)
     {
-        sprint("stack overflow!\n");
-        sys_user_exit(-1);
-        // panic("this address is not available\n");
-        break;
+      sprint("stack overflow!\n");
+      sys_user_exit(-1);
+      // panic("this address is not available\n");
+      break;
     }
     pte = page_walk(current[hartid]->pagetable, stval, 0);
-    if (pte == NULL) // 缺页异常
+    if (pte == 0) // 缺页异常
     {
       sprint("page_fault\n");
       pa = (uint64)alloc_page(); // allocate a new physical page
@@ -85,8 +84,9 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
     else if (*pte & PTE_C)
     {
       sprint("copy on write\n");
+
       pa = PTE2PA(*pte);
-      heap_copy_on_write(current[hartid], current[hartid]->parent, pa);
+      copy_on_write_on_heap(current[hartid], current[hartid]->parent, pa);
     }
     break;
   default:
@@ -100,12 +100,12 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
 //
 void rrsched()
 {
-  int hartid = read_tp();
   // TODO (lab3_3): implements round-robin scheduling.
-  // hint: increase the tick_count member of current process by one, if it is bigger than
+  // hint: increase the tick_count member of current[hartid] process by one, if it is bigger than
   // TIME_SLICE_LEN (means it has consumed its time slice), change its status into READY,
   // place it in the rear of ready queue, and finally schedule next process to run.
   //  panic( "You need to further implement the timer handling in lab3_3.\n" );
+  int hartid = read_tp();
   current[hartid]->tick_count++;
   if (current[hartid]->tick_count >= TIME_SLICE_LEN)
   {
@@ -122,9 +122,9 @@ void rrsched()
 //
 void smode_trap_handler(void)
 {
-  int hartid = read_tp();
   // make sure we are in User mode before entering the trap handling.
   // we will consider other previous case in lab1_3 (interrupt).
+  int hartid = read_tp();
   if ((read_csr(sstatus) & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
@@ -159,6 +159,6 @@ void smode_trap_handler(void)
     panic("unexpected exception happened.\n");
     break;
   }
-  // continue (come back to) the execution of current process.
+  // continue (come back to) the execution of current[hartid] process.
   switch_to(current[hartid]);
 }

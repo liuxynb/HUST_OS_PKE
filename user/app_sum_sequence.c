@@ -17,14 +17,12 @@ uint64 sum_sequence(uint64 n, int *p) {
   if (n == 0)
     return 0;
   else
-  {
-    printu("n: %ld, p: %p\n", n, p);
-  }
-  return *p=sum_sequence( n-1, p+1 ) + n;
+    return *p=sum_sequence( n-1, p+1 ) + n;
 }
 
 int main(void) {
   // FIRST, we need a large enough "n" to trigger pagefaults in the user stack
+  printu("pagefault test\n");
   uint64 n = 1024;
 
   // alloc a page size array(int) to store the result of every step

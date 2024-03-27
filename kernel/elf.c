@@ -446,7 +446,7 @@ void load_bincode_from_host_elf(process *p,char* filename) {
   // close the host spike file
   vfs_close( info.f );
   p->n_stack_pages = 1;
-  p->ifInit = 0;
+  p->init_flag = 0;
 
   sprint("hartid = %d:Application program entry point (virtual address): 0x%lx\n",tp,p->trapframe->epc);
 }

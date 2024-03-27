@@ -153,7 +153,7 @@ int do_open(char *pathname, int flags)
   int fd = 0;
   if (current[hartid]->pfiles->nfiles >= MAX_FILES)
   {
-    panic("do_open: no file entry for current process!\n");
+    panic("do_open: no file entry for current[hartid] process!\n");
   }
   struct file *pfile;
   for (fd = 0; fd < MAX_FILES; ++fd)
@@ -267,7 +267,7 @@ int do_opendir(char *pathname)
       break;
   }
   if (pfile->status != FD_NONE) // no free entry
-    panic("do_opendir: no file entry for current process!\n");
+    panic("do_opendir: no file entry for current[hartid] process!\n");
 
   // initialize this file structure
   memcpy(pfile, opened_file, sizeof(struct file));
@@ -352,7 +352,7 @@ int do_change_cwd(char *pathpa)
   transfer_2_absolute_path(pathpa, absolute_path);
   int found = do_opendir(absolute_path);
   current[hartid]->pfiles->cwd = current[hartid]->pfiles->opened_files[found].f_dentry; // 实现change cwd
-  sprint("do_change_cwd:current->pfiles->cwd:%s\n", current[hartid]->pfiles->cwd->name);
+  sprint("do_change_cwd:current[hartid]->pfiles->cwd:%s\n", current[hartid]->pfiles->cwd->name);
   do_closedir(found);
 
   return 0;

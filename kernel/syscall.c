@@ -16,16 +16,11 @@
 #include "proc_file.h"
 #include "elf.h"
 #include "spike_interface/spike_file.h"
-#include "sync_utils.h"
+#include "process.h"
+
 #include "spike_interface/spike_utils.h"
 
 extern struct elf_sym_table elf_sym_tab;
-
-uint64 readtp()
-{
-  int hartid = read_tp();
-  return hartid;
-}
 
 static void transfer_2_absolute_path(char *relative_path, char *absolute_path)
 {
@@ -35,6 +30,7 @@ static void transfer_2_absolute_path(char *relative_path, char *absolute_path)
    * 在和相对路径拼接，得到绝对路径
    */
   //     sprint("relative_path:%s\n",relative_path);
+  int hartid = read_tp();
   if (relative_path[0] == '/')
   {
     memcpy(absolute_path, relative_path, strlen(relative_path));
@@ -45,7 +41,7 @@ static void transfer_2_absolute_path(char *relative_path, char *absolute_path)
     sprint("the relative path is not start with '/'\n");
   }
   int type = 0;
-  struct dentry *cwd = current[readtp()]->pfiles->cwd;
+  struct dentry *cwd = current[hartid]->pfiles->cwd;
   // sprint("***cwd:%s***\n",cwd->name);
   if (relative_path[0] == '.')
   {
@@ -92,9 +88,9 @@ static void transfer_2_absolute_path(char *relative_path, char *absolute_path)
 //
 ssize_t sys_user_print(const char *buf, size_t n)
 {
-  int hartid = read_tp();
   // buf is now an address in user space of the given app's user stack,
   // so we have to transfer it into phisical address (kernel is running in direct mapping).
+  int hartid = read_tp();
   assert(current[hartid]);
   char *pa = (char *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), (void *)buf);
   sprint(pa);
@@ -104,23 +100,26 @@ ssize_t sys_user_print(const char *buf, size_t n)
 //
 // implement the SYS_user_exit syscall
 //
-volatile int exit_syn = 0;
 ssize_t sys_user_exit(uint64 code)
 {
   uint64 hartid = read_tp();
-  sprint("hartid = %d: User exit with code: %d.\n", hartid, code);
-  sync_barrier(&exit_syn, NCPU);
 
-  if (hartid == 0)
+  sprint("User exit with code:%d.\n", code);
+
+  if (current[hartid]->parent != NULL && current[hartid]->parent->status == BLOCKED)
   {
-    free_process(current[hartid]);
-    schedule(1);
+    if (current[hartid]->parent->waitpid == -1)
+    {
+      insert_to_ready_queue(current[hartid]->parent);
+    }
+    else if (current[hartid]->parent->waitpid == current[hartid]->pid)
+    {
+      insert_to_ready_queue(current[hartid]->parent);
+    }
   }
-  else
-  {
-    free_process(current[hartid]);
-  }
-  sync_barrier(&exit_syn, NCPU);
+
+  free_process(current[hartid]);
+  schedule();
   return 0;
 }
 
@@ -133,17 +132,17 @@ uint64 sys_user_allocate_page(uint64 n)
   // uint64 va;
   // // if there are previously reclaimed pages, use them first (this does not change the
   // // size of the heap)
-  // if (current->user_heap.free_pages_count > 0) {
-  //   va =  current->user_heap.free_pages_address[--current->user_heap.free_pages_count];
-  //   assert(va < current->user_heap.heap_top);
+  // if (current[hartid]->user_heap.free_pages_count > 0) {
+  //   va =  current[hartid]->user_heap.free_pages_address[--current[hartid]->user_heap.free_pages_count];
+  //   assert(va < current[hartid]->user_heap.heap_top);
   // } else {
   //   // otherwise, allocate a new page (this increases the size of the heap by one page)
-  //   va = current->user_heap.heap_top;
-  //   current->user_heap.heap_top += PGSIZE;
+  //   va = current[hartid]->user_heap.heap_top;
+  //   current[hartid]->user_heap.heap_top += PGSIZE;
 
-  //   current->mapped_info[HEAP_SEGMENT].npages++;
+  //   current[hartid]->mapped_info[HEAP_SEGMENT].npages++;
   // }
-  // user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+  // user_vm_map((pagetable_t)current[hartid]->pagetable, va, PGSIZE, (uint64)pa,
   //        prot_to_type(PROT_WRITE | PROT_READ, 1));
   return malloc((int)n);
 }
@@ -153,9 +152,9 @@ uint64 sys_user_allocate_page(uint64 n)
 //
 uint64 sys_user_free_page(uint64 va)
 {
-  // user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
+  // user_vm_unmap((pagetable_t)current[hartid]->pagetable, va, PGSIZE, 1);
   // // add the reclaimed page to the free page list
-  // current->user_heap.free_pages_address[current->user_heap.free_pages_count++] = va;
+  // current[hartid]->user_heap.free_pages_address[current[hartid]->user_heap.free_pages_count++] = va;
   free((void *)va);
   return 0;
 }
@@ -166,7 +165,8 @@ uint64 sys_user_free_page(uint64 va)
 ssize_t sys_user_fork()
 {
   // sprint("User call fork.\n");
-  return do_fork(current[readtp()]);
+  int hartid = read_tp();
+  return do_fork(current[hartid]);
 }
 
 //
@@ -191,7 +191,8 @@ ssize_t sys_user_yield()
 //
 ssize_t sys_user_open(char *pathva, int flags)
 {
-  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), pathva);
+  int hartid = read_tp();
+  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), pathva);
   return do_open(pathpa, flags);
 }
 
@@ -200,11 +201,12 @@ ssize_t sys_user_open(char *pathva, int flags)
 //
 ssize_t sys_user_read(int fd, char *bufva, uint64 count)
 {
+  int hartid = read_tp();
   int i = 0;
   while (i < count)
   { // count can be greater than page size
     uint64 addr = (uint64)bufva + i;
-    uint64 pa = lookup_pa((pagetable_t)current[readtp()]->pagetable, addr);
+    uint64 pa = lookup_pa((pagetable_t)current[hartid]->pagetable, addr);
     uint64 off = addr - ROUNDDOWN(addr, PGSIZE);
     uint64 len = count - i < PGSIZE - off ? count - i : PGSIZE - off;
     uint64 r = do_read(fd, (char *)pa + off, len);
@@ -220,11 +222,12 @@ ssize_t sys_user_read(int fd, char *bufva, uint64 count)
 //
 ssize_t sys_user_write(int fd, char *bufva, uint64 count)
 {
+  int hartid = read_tp();
   int i = 0;
   while (i < count)
   { // count can be greater than page size
     uint64 addr = (uint64)bufva + i;
-    uint64 pa = lookup_pa((pagetable_t)current[readtp()]->pagetable, addr);
+    uint64 pa = lookup_pa((pagetable_t)current[hartid]->pagetable, addr);
     uint64 off = addr - ROUNDDOWN(addr, PGSIZE);
     uint64 len = count - i < PGSIZE - off ? count - i : PGSIZE - off;
     uint64 r = do_write(fd, (char *)pa + off, len);
@@ -248,7 +251,8 @@ ssize_t sys_user_lseek(int fd, int offset, int whence)
 //
 ssize_t sys_user_stat(int fd, struct istat *istat)
 {
-  struct istat *pistat = (struct istat *)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), istat);
+  int hartid = read_tp();
+  struct istat *pistat = (struct istat *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), istat);
   return do_stat(fd, pistat);
 }
 
@@ -257,7 +261,8 @@ ssize_t sys_user_stat(int fd, struct istat *istat)
 //
 ssize_t sys_user_disk_stat(int fd, struct istat *istat)
 {
-  struct istat *pistat = (struct istat *)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), istat);
+  int hartid = read_tp();
+  struct istat *pistat = (struct istat *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), istat);
   return do_disk_stat(fd, pistat);
 }
 
@@ -274,7 +279,8 @@ ssize_t sys_user_close(int fd)
 //
 ssize_t sys_user_opendir(char *pathva)
 {
-  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), pathva);
+  int hartid = read_tp();
+  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), pathva);
   return do_opendir(pathpa);
 }
 
@@ -283,7 +289,8 @@ ssize_t sys_user_opendir(char *pathva)
 //
 ssize_t sys_user_readdir(int fd, struct dir *vdir)
 {
-  struct dir *pdir = (struct dir *)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), vdir);
+  int hartid = read_tp();
+  struct dir *pdir = (struct dir *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), vdir);
   return do_readdir(fd, pdir);
 }
 
@@ -293,7 +300,7 @@ ssize_t sys_user_readdir(int fd, struct dir *vdir)
 ssize_t sys_user_mkdir(char *pathva)
 {
   int hartid = read_tp();
-  sprint("user_s0:%lx\n", current[hartid]->trapframe->regs.s0);
+  // sprint("user_s0:%lx\n",current[hartid]->trapframe->regs.s0);
   char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), pathva);
   return do_mkdir(pathpa);
 }
@@ -322,13 +329,24 @@ ssize_t sys_user_link(char *vfn1, char *vfn2)
 //
 ssize_t sys_user_unlink(char *vfn)
 {
-  char *pfn = (char *)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), (void *)vfn);
+  int hartid = read_tp();
+  char *pfn = (char *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), (void *)vfn);
   return do_unlink(pfn);
 }
 
+//
+// lib call to wait
+//
 ssize_t sys_user_wait(int pid)
 {
-  return do_wait(pid);
+  if (pid == 0 || procs[pid].parent != current[read_tp()])
+  {
+    return -1;
+  }
+  current[read_tp()]->status = BLOCKED;
+  current[read_tp()]->waitpid = pid;
+  schedule();
+  return pid;
 }
 ssize_t sys_user_exec(char *path, char *para)
 {
@@ -384,7 +402,8 @@ ssize_t sys_sem_v(int sem_id)
 //
 ssize_t sys_user_read_cwd(char *pathva)
 {
-  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), pathva); // 得到物理地址z
+  int hartid = read_tp();
+  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), pathva); // 得到物理地址z
   // sprint("pathpa:%s\n",pathpa);
   return do_read_cwd(pathpa);
 }
@@ -394,7 +413,8 @@ ssize_t sys_user_read_cwd(char *pathva)
 //
 ssize_t sys_user_change_cwd(char *pathva)
 {
-  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), pathva);
+  int hartid = read_tp();
+  char *pathpa = (char *)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), pathva);
   return do_change_cwd(pathpa);
 }
 int print_func_name(uint64 ret_addr)
@@ -412,11 +432,11 @@ int print_func_name(uint64 ret_addr)
   }
   return 1;
 }
-// added lab1_c1
+// added lab1_ch1
 ssize_t sys_user_print_backtrace(uint64 n)
 {
-  //  sprint("sp:%lx,s0:%lx", current->trapframe->regs.sp, current->trapframe->regs.s0);
-  // sprint("print backtrace:user_s0=%lx,user_sp=%lx\n",current->trapframe->regs.s0,current->trapframe->regs.sp);
+  //  sprint("sp:%lx,s0:%lx", current[hartid]->trapframe->regs.sp, current[hartid]->trapframe->regs.s0);
+  // sprint("print backtrace:user_s0=%lx,user_sp=%lx\n",current[hartid]->trapframe->regs.s0,current[hartid]->trapframe->regs.sp);
   int hartid = read_tp();
   uint64 user_s0 = current[hartid]->trapframe->regs.s0; // 得到s0
   uint64 user_sp = user_s0;                             // sp = s0，得到用户态的sp
@@ -434,11 +454,11 @@ ssize_t sys_user_print_backtrace(uint64 n)
   return 0;
 }
 
-// added lab3c3
 ssize_t sys_user_printpa(uint64 va)
 {
-  uint64 pa = (uint64)user_va_to_pa((pagetable_t)(current[readtp()]->pagetable), (void *)va);
-  sprint("0x%x\n", pa);
+  int hartid = read_tp();
+  uint64 pa = (uint64)user_va_to_pa((pagetable_t)(current[hartid]->pagetable), (void *)va);
+  sprint("pa:%lx\n", pa);
   return 0;
 }
 

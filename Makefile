@@ -130,23 +130,18 @@ USER_HM_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_HM_CPPS)))
 
 USER_HM_TARGET 	:= $(HOSTFS_ROOT)/bin/heap
 
-USER_CW_CPPS 		:= user/app_cow.c user/user_lib.c
+USER_COW_CPPS 		:= user/app_cow.c user/user_lib.c
 
-USER_CW_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_CW_CPPS)))
+USER_COW_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_COW_CPPS)))
 
-USER_CW_TARGET 	:= $(HOSTFS_ROOT)/bin/cow
+USER_COW_TARGET 	:= $(HOSTFS_ROOT)/bin/cow
 
-USER_P_CPPS 		:= user/app0.c user/user_lib.c
+USER_HELP_CPPS 		:= user/app_help.c user/user_lib.c
 
-USER_P_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_P_CPPS)))
+USER_HELP_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_HELP_CPPS)))
 
-USER_P_TARGET 	:= $(HOSTFS_ROOT)/bin/app0
+USER_HELP_TARGET 	:= $(HOSTFS_ROOT)/bin/help
 
-USER_N_CPPS 		:= user/app1.c user/user_lib.c
-
-USER_N_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_N_CPPS)))
-
-USER_N_TARGET 	:= $(HOSTFS_ROOT)/bin/app1
 #------------------------targets------------------------
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	
@@ -164,10 +159,8 @@ $(OBJ_DIR):
 	@-mkdir -p $(dir $(USER_BT_OBJS))
 	@-mkdir -p $(dir $(USER_SEM_OBJS))
 	@-mkdir -p $(dir $(USER_HM_OBJS))
-	@-mkdir -p $(dir $(USER_CW_OBJS))
-	@-mkdir -p $(dir $(USER_P_OBJS))
-	@-mkdir -p $(dir $(USER_N_OBJS))
-
+	@-mkdir -p $(dir $(USER_COW_OBJS))
+	@-mkdir -p $(dir $(USER_HELP_OBJS))
 	
 $(OBJ_DIR)/%.o : %.c
 	@echo "compiling" $<
@@ -259,22 +252,16 @@ $(USER_HM_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_HM_OBJS)
 	@$(COMPILE) --entry=main $(USER_HM_OBJS) $(UTIL_LIB) -o $@
 	@echo "User app has been built into" \"$@\"
 
-$(USER_CW_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_CW_OBJS)
+$(USER_COW_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_COW_OBJS)
 	@echo "linking" $@	...	
 	-@mkdir -p $(HOSTFS_ROOT)/bin
-	@$(COMPILE) --entry=main $(USER_CW_OBJS) $(UTIL_LIB) -o $@
+	@$(COMPILE) --entry=main $(USER_COW_OBJS) $(UTIL_LIB) -o $@
 	@echo "User app has been built into" \"$@\"
 
-$(USER_N_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_N_OBJS)
+$(USER_HELP_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_HELP_OBJS)
 	@echo "linking" $@	...	
 	-@mkdir -p $(HOSTFS_ROOT)/bin
-	@$(COMPILE) --entry=main $(USER_N_OBJS) $(UTIL_LIB) -o $@
-	@echo "User app has been built into" \"$@\"
-
-$(USER_P_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_P_OBJS)
-	@echo "linking" $@	...	
-	-@mkdir -p $(HOSTFS_ROOT)/bin
-	@$(COMPILE) --entry=main $(USER_P_OBJS) $(UTIL_LIB) -o $@
+	@$(COMPILE) --entry=main $(USER_HELP_OBJS) $(UTIL_LIB) -o $@
 	@echo "User app has been built into" \"$@\"
 
 -include $(wildcard $(OBJ_DIR)/*/*.d)
@@ -282,12 +269,13 @@ $(USER_P_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_P_OBJS)
 
 .DEFAULT_GOAL := $(all)
 
-all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET} ${USER_CW_TARGET} $(USER_N_TARGET) $(USER_P_TARGET)
+all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET} ${USER_COW_TARGET} ${USER_HELP_TARGET} 
+	
 .PHONY:all
 
-run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET} ${USER_CW_TARGET} $(USER_N_TARGET) $(USER_P_TARGET)
+run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET) $(USER_EL_TARGET) $(USER_PF_TARGET) $(USER_SEM_TARGET) $(USER_BT_TARGET) ${USER_HM_TARGET} ${USER_COW_TARGET} ${USER_HELP_TARGET} 
 	@echo "********************HUST PKE********************"
-	spike $(KERNEL_TARGET) /bin/shell
+	spike -p2 $(KERNEL_TARGET)  /bin/shell /bin/help
 
 # need openocd!
 gdb:$(KERNEL_TARGET) $(USER_TARGET)

@@ -119,7 +119,7 @@ int rfs_format_dev(struct device *dev) {
     return -1;
   }
 
-  sprint("RFS: format %s done!\n", dev->dev_name);
+  // sprint("RFS: format %s done!\n", dev->dev_name);
   return 0;
 }
 

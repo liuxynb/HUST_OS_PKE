@@ -3,7 +3,6 @@
 
 #include "riscv.h"
 #include "proc_file.h"
-// #include "elf.h"
 typedef struct trapframe_t {
   // space to store context (all common registers)
   /* offset:0   */ riscv_regs regs;
@@ -91,6 +90,8 @@ typedef struct process_t {
 
   // process id
   uint64 pid;
+  uint64 hartid;
+  uint64 waitpid;
   // process status
   int status;
   // parent process
@@ -113,7 +114,7 @@ typedef struct process_t {
   uint64 mcb_tail; // 内存控制块链表尾指针的地址pa
   //added lab2_ch1
   uint64 n_stack_pages;
-  int ifInit;      // 是否初始化过
+  int init_flag;//mem_control_block链表是否初始化的标志
 }process;
 
 /* -- 信号量的定义 -- */
@@ -151,8 +152,10 @@ int do_sem_free(int sem_id);
 
 // current running process
 extern process* current[NCPU];
+extern process procs[NPROC];
 extern semaphore sem_pool[NPROC];
 // address of the first free page in our simple heap. added @lab2_2
-extern uint64 g_ufree_page;
+extern uint64 g_ufree_page[NCPU];
 #endif
 void init_process(process *p);
+void copy_on_write_on_heap(process * child,process * parent,uint64 pa);
