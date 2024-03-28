@@ -18,16 +18,13 @@ typedef struct elf_info_t
 } elf_info;
 
 struct elf_sym_table elf_sym_tab;
-//
+
 // the implementation of allocater. allocates memory space for later segment loading.
 // this allocater is heavily modified @lab2_1, where we do NOT work in bare mode.
-//
+
 static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 size)
 {
   elf_info *msg = (elf_info *)ctx->info;
-  // we assume that size of proram segment is smaller than a page.
-  // sprint("*****size: %lx*****\n", size);
-  kassert(size < PGSIZE);
   void *pa = alloc_page();
   if (pa == 0)
     panic("uvmalloc mem alloc falied\n");
@@ -38,6 +35,7 @@ static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 siz
 
   return pa;
 }
+
 static void *elf_process_alloc_mb(process *p, uint64 elf_pa, uint64 elf_va, uint64 size)
 {
   // we assume that size of proram segment is smaller than a page.
@@ -353,16 +351,20 @@ elf_status elf_load(elf_ctx *ctx)
     int page;
     uint64 vaddr = ph_addr.vaddr;
     uint64 ph_addr_off = ph_addr.off;
-
+    // sprint("npage = %d\n", npage);
     for (page = 0; page < npage; page++)
     {
+      // sprint("page = %d\n", page);
       uint64 load_size = (page != npage - 1) ? PGSIZE : (ph_addr.memsz % PGSIZE);
+      // sprint("actual loading1\n");
       void *dest = elf_alloc_mb(ctx, vaddr, vaddr, load_size);
       vaddr += PGSIZE;
+     //  sprint("actual loading2\n");
       // actual loading
       if (elf_fpread(ctx, dest, load_size, ph_addr.off + page * PGSIZE) != load_size)
         return EL_EIO;
     }
+    // sprint("allocate memory block before elf loading ok\n");
 
     // record the vm region in proc->mapped_info. added @lab3_1
     int j;
