@@ -365,11 +365,12 @@ ssize_t sys_user_exec(char *path, char *para)
 
   // 执行程序
   // sprint("*** exec ***\n");
+  // sprint("absolute_path = %s\n", absolute_path);
   int ret = do_exec(absolute_path, absolute_para);
   if (ret < 0)
   {
     sprint("exec failed\n");
-    return -1;
+    return 0;
   }
   return 0;
 }

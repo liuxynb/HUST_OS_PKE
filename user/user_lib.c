@@ -164,7 +164,7 @@ int wait(int pid){
 
 //lib call to exec
 int exec(char *command,char * para){
-  return do_user_call(SYS_user_exec, (uint64)command, (uint64)para, 0, 0, 0, 0, 0);
+  return do_user_call(SYS_user_exec, (uint64) command, (uint64)para, 0, 0, 0, 0, 0);
 }
 
 //lib call to scan

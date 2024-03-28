@@ -40,6 +40,7 @@ enum segment_type {
   HEAP_SEGMENT,    // runtime heap segment
   CODE_SEGMENT,    // ELF segment
   DATA_SEGMENT,    // ELF segment
+  WRE_SEGMENT     
 };
 
 // the VM regions mapped to a user process

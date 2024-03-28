@@ -7,9 +7,10 @@
 /bin/ls /RAMDISK0
 END END
 /bin/mkdir /RAMDISK0/sub_dir
-/bin/backtrace
-/bin/sem
-/bin/cow
 cd /RAMDISK0/sub_dir
-
-
+/bin/cow
+/bin/backtrace
+/bin/errorline
+/bin/sem
+/bin/pagefault
+/bin/ls ./

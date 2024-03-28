@@ -103,11 +103,9 @@ void init_proc_pool()
 // allocate an empty process, init its vm space. returns the pointer to
 // process strcuture. added @lab3_1
 //
-volatile int alloc_lock = 1;
 process *alloc_process()
 {
     // locate the first usable process structure
-    spin_lock(&alloc_lock);
     int i;
 
     for (i = 0; i < NPROC; i++)
@@ -187,7 +185,6 @@ process *alloc_process()
     procs[i].hartid = read_tp();
     // initialize files_struct
     procs[i].pfiles = init_proc_file_management();
-    spin_unlock(&alloc_lock);
     return &procs[i];
 }
 
@@ -222,10 +219,12 @@ int do_fork(process *parent)
     // sprint("will fork a child from parent %d.\n", parent->pid);
     process *child = alloc_process();
     int hartid = read_tp();
+    // sprint("do_fork\n");
     for (int i = 0; i < parent->total_mapped_region; i++)
     {
         // browse parent's vm space, and copy its trapframe and data segments,
         // map its code segment.
+
         switch (parent->mapped_info[i].seg_type)
         {
         case CONTEXT_SEGMENT:
@@ -542,7 +541,11 @@ int do_exec(char *path, char *para)
 {
     int hartid = read_tp();
     init_process(current[hartid]);
-    load_bincode_from_host_elf(current[hartid], path);
+    if(load_bincode_from_host_elf(current[hartid], path) == -1)
+    {
+        sprint("path error!\n");
+        return -1;
+    }
     // push into stack
     size_t *vsp = (size_t *)current[hartid]->trapframe->regs.sp;
     vsp -= 8;
